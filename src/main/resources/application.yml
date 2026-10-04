@@ -1,0 +1,41 @@
+# Party Bus under Spring Boot (the embabel profile). The standalone demo reads
+# none of this; it boards the bus in code. With -Pembabel, the AgentSpaces
+# starter and the Embabel starter both read it.
+server:
+  port: 8749            # Tripper flies 8747; the bus parks two doors down
+
+agentspaces:
+  keystore: ./partybus-keys
+  bind: 0.0.0.0:7700
+  transport:
+    channel-auth: attested        # SPEC §5.6: TLS vouches for the sender, frames travel bare
+    tls:
+      enabled: true
+  groups:
+    - name: partybus
+      founding: partybus-v1
+      spaces:
+        - { name: trip }
+        - { name: research }
+        - { name: signals }
+        - { name: advisories }
+        - { name: decisions }
+        - { name: slots, strategy: AUCTION }
+        - { name: bookings }
+        - { name: fleet-control }
+        - { name: c2-audit }
+  embabel:
+    remote-actions-enabled: true
+    remote-action-timeout-millis: 60000
+    remote-agent-name: partyBusFleet
+  console:
+    enabled: true
+    port: 7590
+    fleet-name: partybus
+    command:
+      enabled: true
+      token: ${PARTYBUS_OPERATOR_TOKEN:partybus-operator}
+
+embabel:
+  models:
+    default-llm: gpt-4.1-mini     # as Tripper's researcher; the plan itself deserves a better one

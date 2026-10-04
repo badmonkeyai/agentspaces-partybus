@@ -1,0 +1,211 @@
+{
+  "_about": "A recorded trip for the vacation simulator and the flow test: Boston to Lisbon, a party of three, one bad week. Links are to real sites; prices and ratings are illustrative. The live sources replace all of this the moment the API keys are set.",
+
+  "links": {
+    "search": {
+      "default": [
+        {"url": "https://www.visitlisboa.com/", "summary": "Visit Lisboa. The official tourism site: neighbourhoods, events, the Lisboa Card."},
+        {"url": "https://www.lonelyplanet.com/portugal/lisbon", "summary": "Lisbon travel guide. Alfama, Belém, the trams, and where to eat."},
+        {"url": "https://www.timeout.com/lisbon", "summary": "Time Out Lisbon. What is on this week, restaurants, bars, and the Time Out Market."}
+      ],
+      "flights": [
+        {"url": "https://www.flytap.com/", "summary": "TAP Air Portugal. Nonstop Boston (BOS) to Lisbon (LIS), evening departure, morning arrival."},
+        {"url": "https://www.google.com/travel/flights", "summary": "Google Flights. BOS to LIS in early October from about $640 round trip, one stop via Newark or Dublin from $520."},
+        {"url": "https://www.rome2rio.com/map/Boston/Lisbon", "summary": "Rome2rio. Boston to Lisbon: fly 6h 45m nonstop; no sensible rail alternative across an ocean."}
+      ],
+      "hotels": [
+        {"url": "https://www.booking.com/city/pt/lisbon.html", "summary": "Booking.com Lisbon. Step-free rooms filter available; Baixa and Chiado are the flattest central districts."},
+        {"url": "https://www.airbnb.com/s/Lisbon--Portugal/homes", "summary": "Airbnb Lisbon. Apartments in Baixa with elevators from about $95 a night in October."},
+        {"url": "https://www.pousadas.pt/", "summary": "Pousadas de Portugal. The Pousada de Lisboa on Praça do Comércio, a splurge with a lift and a pool."}
+      ],
+      "car rental": [
+        {"url": "https://www.rentalcars.com/", "summary": "Rentalcars Lisbon airport. Compact automatics from $38 a day; accessible vans on request."},
+        {"url": "https://www.bolt.eu/", "summary": "Bolt operates across Lisbon; Uber too. Cheaper than a rental in a city where parking is a contact sport."},
+        {"url": "https://www.carris.pt/", "summary": "Carris. Trams and buses; the 28 is the famous one, the 15E to Belém is the useful one."}
+      ],
+      "things to do": [
+        {"url": "https://www.patrimoniocultural.gov.pt/en/museus-e-monumentos/dgpc/m/mosteiro-dos-jeronimos/", "summary": "Jerónimos Monastery. Manueline masterpiece in Belém; book ahead, queues by 10am."},
+        {"url": "https://www.museudoazulejo.gov.pt/", "summary": "Museu Nacional do Azulejo. Five centuries of tile in a former convent; Priya's whole personality."},
+        {"url": "https://www.castelodesaojorge.pt/", "summary": "Castelo de São Jorge. Views over everything; the climb is steep and the cobbles are unkind."},
+        {"url": "https://www.lxfactory.com/", "summary": "LX Factory. Old industrial site under the bridge, now bookshops, food, and a Sunday market."},
+        {"url": "https://www.parquesdesintra.pt/", "summary": "Sintra and Pena Palace. A day trip by train from Rossio; go early, take the bus up."}
+      ],
+      "restaurants": [
+        {"url": "https://www.timeout.com/lisbon/restaurants", "summary": "Time Out: the best restaurants in Lisbon. Cervejaria Ramiro for shellfish, Taberna da Rua das Flores for petiscos, Ao 26 Vegan Food Project."},
+        {"url": "https://www.theworlds50best.com/", "summary": "Belcanto (José Avillez) in Chiado; Prado for seasonal Portuguese; both reserve weeks ahead."},
+        {"url": "https://guide.michelin.com/en/pt/lisboa-region/lisboa/restaurants", "summary": "Michelin Guide Lisbon. Bib Gourmands under $40 a head include Zé da Mouraria and O Velho Eurico."}
+      ],
+      "reviews": [
+        {"url": "https://www.tripadvisor.com/Tourism-g189158-Lisbon_Lisbon_District_Central_Portugal-Vacations.html", "summary": "Tripadvisor Lisbon. 4.6 average. Praise: light, food, friendliness, value. Complaints: hills, crowds at the tram 28, pickpockets on the 28."},
+        {"url": "https://www.reddit.com/r/travel/", "summary": "r/travel Lisbon threads. 'Wear real shoes.' 'Skip the tram 28 at noon.' 'The Time Out Market is fine but go to a tasca.'"}
+      ],
+      "accessibility": [
+        {"url": "https://www.visitlisboa.com/en/accessible-tourism", "summary": "Accessible Lisbon. Step-free routes through Baixa and along the river; the Santa Justa lift and the funiculars are the shortcuts up."},
+        {"url": "https://www.metrolisboa.pt/en/", "summary": "Metro Lisboa accessibility. Most stations have lifts; Baixa-Chiado is deep but served; some Green line stations still lack them."},
+        {"url": "https://www.sagetraveling.com/lisbon-accessible-travel", "summary": "Sage Traveling. Alfama and the castle are the hard parts; Belém and Parque das Nações are flat and rewarding."}
+      ],
+      "consulate": [
+        {"url": "https://pt.usembassy.gov/", "summary": "U.S. Embassy Lisbon, Avenida das Forças Armadas. Emergency passports by appointment; lost-passport walk-ins weekday mornings."}
+      ],
+      "destinations like": [
+        {"url": "https://www.visitporto.travel/", "summary": "Porto. Two and a half hours north by train; port wine, the Douro, tiles, and hills that make Lisbon look flat."},
+        {"url": "https://www.andalucia.org/en/", "summary": "Seville. Moorish architecture, tapas culture, flat old town, October is finally cool enough."},
+        {"url": "https://www.visitazores.com/", "summary": "The Azores. A two-hour hop; volcanic pools, no crowds, cheese, and the greenest place you have seen."}
+      ],
+      "reddit": [
+        {"url": "https://www.reddit.com/r/portugal/", "summary": "r/portugal, this week: 'Anyone else stuck in Baixa during the march?' 'Peaceful, loud, avoid Rossio till evening.' 'Metro strike Thursday confirmed.'"},
+        {"url": "https://www.tripadvisor.com/ShowForum-g189158-i203-Lisbon_Lisbon_District_Central_Portugal.html", "summary": "Tripadvisor forum: 'Is Lisbon safe right now?' Replies: yes, avoid the demonstration route, taxis are fine."}
+      ]
+    },
+    "news": {
+      "default": [
+        {"url": "https://www.theportugalnews.com/", "summary": "Lisbon tourism numbers hit a new October record; hotels near capacity."},
+        {"url": "https://www.publico.pt/", "summary": "Câmara de Lisboa extends the riverside pedestrian route to Belém."},
+        {"url": "https://www.rtp.pt/noticias/", "summary": "Weather: an Atlantic front brings squalls Sunday, clearing by Tuesday."}
+      ],
+      "protest": [
+        {"url": "https://www.publico.pt/", "summary": "Transport unions march on the Assembleia da República; Baixa and Rossio closed to traffic from noon."},
+        {"url": "https://www.rtp.pt/noticias/", "summary": "Police estimate 30,000 at the demonstration; peaceful, one arrest, roads reopened by 9pm."},
+        {"url": "https://www.theportugalnews.com/", "summary": "Metro and ferry workers announce a 24-hour strike for Thursday."}
+      ]
+    },
+    "images": {
+      "default": [
+        {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Lisbon_%2836831596786%29_%28cropped%29.jpg/1280px-Lisbon_%2836831596786%29_%28cropped%29.jpg", "summary": "Alfama rooftops from the Miradouro das Portas do Sol"},
+        {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Jer%C3%B3nimos_Monastery_-_Lisbon_2015_%2823880011906%29.jpg/1280px-Jer%C3%B3nimos_Monastery_-_Lisbon_2015_%2823880011906%29.jpg", "summary": "Jerónimos Monastery, Belém"},
+        {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tram_28_Lisbon.jpg/1280px-Tram_28_Lisbon.jpg", "summary": "Tram 28 climbing through Graça"},
+        {"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Azulejos_Lisboa.jpg/1280px-Azulejos_Lisboa.jpg", "summary": "Azulejo façade, Bairro Alto"}
+      ]
+    },
+    "videos": {
+      "default": [
+        {"url": "https://www.youtube.com/results?search_query=lisbon+travel+guide", "summary": "Lisbon in 4 days: the honest guide. Trams, tascas, and how not to get pickpocketed."},
+        {"url": "https://www.youtube.com/results?search_query=lisbon+food+tour", "summary": "We ate everything in Lisbon: pastel de nata, bifana, ginjinha, grilled sardines."}
+      ],
+      "protest": [
+        {"url": "https://www.youtube.com/results?search_query=lisbon+protest+live", "summary": "LIVE: Massive protest fills Lisbon's Rossio square, police lines on Rua Augusta."},
+        {"url": "https://www.youtube.com/results?search_query=lisbon+strike", "summary": "Lisbon paralysed: metro strike, ferries stopped, tourists stranded at Cais do Sodré."},
+        {"url": "https://www.youtube.com/results?search_query=is+lisbon+safe", "summary": "Is Lisbon SAFE right now?? What the news won't tell you (it is fine, mostly)."}
+      ]
+    }
+  },
+
+  "places": {
+    "hospital": [
+      {"name": "Hospital de São José", "address": "Rua José António Serrano", "lat": 38.7168, "lon": -9.1355, "phone": "+351 21 884 1000", "emergency": true},
+      {"name": "Hospital de Santa Maria", "address": "Avenida Professor Egas Moniz", "lat": 38.7491, "lon": -9.1605, "phone": "+351 21 780 5000", "emergency": true},
+      {"name": "Hospital da Luz Lisboa", "address": "Avenida Lusíada 100", "lat": 38.7563, "lon": -9.1863, "phone": "+351 21 710 4400", "emergency": true},
+      {"name": "Hospital CUF Descobertas", "address": "Rua Mário Botas", "lat": 38.7690, "lon": -9.0953, "phone": "+351 21 002 5200", "emergency": true}
+    ]
+  },
+
+  "structured": {
+    "flights": {
+      "options": [
+        {"carrier": "TAP Air Portugal", "route": "BOS-LIS nonstop", "departs": "2026-10-02 21:15", "returns": "2026-10-09 12:40", "priceUsd": 648.0, "bookingUrl": "https://www.flytap.com/"},
+        {"carrier": "United / TAP", "route": "BOS-EWR-LIS", "departs": "2026-10-02 17:05", "returns": "2026-10-09 11:20", "priceUsd": 524.0, "bookingUrl": "https://www.united.com/"},
+        {"carrier": "Aer Lingus", "route": "BOS-DUB-LIS", "departs": "2026-10-02 19:30", "returns": "2026-10-09 09:55", "priceUsd": 539.0, "bookingUrl": "https://www.aerlingus.com/"}
+      ],
+      "note": "Nonstop lands at 09:30 local, which saves a hotel night of jet lag. Trams and feet from there, as requested."
+    },
+    "hotels": {
+      "location": "Lisbon, Portugal",
+      "options": [
+        {"name": "Hotel da Baixa", "area": "Baixa", "nightlyUsd": 96.0, "rating": 4.5, "accessible": true, "bookingUrl": "https://www.hoteldabaixa.com/"},
+        {"name": "My Story Hotel Rossio", "area": "Rossio", "nightlyUsd": 89.0, "rating": 4.3, "accessible": true, "bookingUrl": "https://www.mystoryhotels.com/"},
+        {"name": "Memmo Alfama", "area": "Alfama", "nightlyUsd": 140.0, "rating": 4.7, "accessible": false, "bookingUrl": "https://www.memmohotels.com/"},
+        {"name": "Pousada de Lisboa", "area": "Praça do Comércio", "nightlyUsd": 210.0, "rating": 4.8, "accessible": true, "bookingUrl": "https://www.pousadas.pt/"}
+      ],
+      "note": "Baixa is flat, has lifts, and is where Dee will be happiest. Memmo Alfama has the view and forty steps."
+    },
+    "cars": {
+      "options": [
+        {"vendor": "Bolt / Uber", "vehicle": "ride-hailing, on demand", "dailyUsd": 24.0, "accessible": true, "bookingUrl": "https://www.bolt.eu/"},
+        {"vendor": "Europcar (LIS)", "vehicle": "Renault Clio automatic", "dailyUsd": 38.0, "accessible": false, "bookingUrl": "https://www.europcar.com/"},
+        {"vendor": "Carris / Metro", "vehicle": "Viva Viagem card, 24h zapping", "dailyUsd": 7.5, "accessible": true, "bookingUrl": "https://www.carris.pt/"}
+      ],
+      "note": "Do not rent a car for Lisbon itself. A car is for the Sintra day, and the train is better even then."
+    },
+    "sights": {
+      "pointsOfInterest": [
+        {"name": "Museu Nacional do Azulejo", "description": "Five centuries of tile in the Madre de Deus convent; step-free ground floor, a café in the cloister.", "location": "Lisbon,+Portugal", "fromDate": "2026-10-03", "toDate": "2026-10-04"},
+        {"name": "Jerónimos Monastery and Belém", "description": "Manueline stone lace, the riverside walk, and the original pastéis de Belém across the road.", "location": "Lisbon,+Portugal", "fromDate": "2026-10-04", "toDate": "2026-10-05"},
+        {"name": "LX Factory", "description": "Industrial ruin turned bookshop, brunch, and market; flat, photogenic, under the bridge.", "location": "Lisbon,+Portugal", "fromDate": "2026-10-05", "toDate": "2026-10-05"},
+        {"name": "Alfama by tram and lift", "description": "Take the 28 up and the Santa Justa lift down; the miradouros do the climbing for Dee.", "location": "Lisbon,+Portugal", "fromDate": "2026-10-06", "toDate": "2026-10-06"},
+        {"name": "Sintra and Pena Palace", "description": "Train from Rossio, bus up the hill, a palace painted by someone with no fear of colour.", "location": "Sintra,+Portugal", "fromDate": "2026-10-07", "toDate": "2026-10-07"},
+        {"name": "Time Out Market and Cais do Sodré", "description": "Marco's pilgrimage; go at 11:30 before the crowd, then the riverside to Ribeira das Naus.", "location": "Lisbon,+Portugal", "fromDate": "2026-10-08", "toDate": "2026-10-08"}
+      ]
+    },
+    "restaurants": {
+      "location": "Lisbon, Portugal",
+      "restaurants": [
+        {"name": "Taberna da Rua das Flores", "cuisine": "Portuguese petiscos", "perPersonUsd": 32.0, "rating": 4.6, "suits": ["vegetarian options"], "url": "https://www.timeout.com/lisbon/restaurants"},
+        {"name": "Cervejaria Ramiro", "cuisine": "shellfish", "perPersonUsd": 45.0, "rating": 4.5, "suits": [], "url": "https://www.cervejariaramiro.com/"},
+        {"name": "Ao 26 Vegan Food Project", "cuisine": "vegan Portuguese", "perPersonUsd": 22.0, "rating": 4.6, "suits": ["vegetarian", "vegan"], "url": "https://www.timeout.com/lisbon/restaurants"},
+        {"name": "Zé da Mouraria", "cuisine": "tasca, lunch only", "perPersonUsd": 18.0, "rating": 4.7, "suits": ["cash", "arrive early"], "url": "https://guide.michelin.com/en/pt/lisboa-region/lisboa/restaurants"},
+        {"name": "Prado", "cuisine": "seasonal Portuguese", "perPersonUsd": 55.0, "rating": 4.6, "suits": ["vegetarian options", "step-free"], "url": "https://www.pradorestaurante.com/"}
+      ]
+    },
+    "diet": {
+      "restaurants": [
+        {"name": "Ao 26 Vegan Food Project", "cuisine": "vegan Portuguese", "perPersonUsd": 22.0, "rating": 4.6, "suits": ["vegetarian", "vegan", "nut-aware"], "url": "https://www.timeout.com/lisbon/restaurants"},
+        {"name": "The Food Temple", "cuisine": "vegetarian, Mouraria", "perPersonUsd": 20.0, "rating": 4.5, "suits": ["vegetarian"], "url": "https://www.timeout.com/lisbon/restaurants"},
+        {"name": "Zé da Mouraria", "cuisine": "grilled fish, plain rice, boiled greens", "perPersonUsd": 18.0, "rating": 4.7, "suits": ["bland food", "recovering"], "url": "https://guide.michelin.com/en/pt/lisboa-region/lisboa/restaurants"}
+      ],
+      "tips": [
+        "'Sou alérgico a marisco' (I am allergic to shellfish). Say it before the bread arrives; the bread comes with something.",
+        "Cataplana and arroz de marisco are shellfish by definition. Caldo verde and bacalhau à Brás are safe, as is most of the pastry.",
+        "For a recovering stomach: canja (chicken rice soup), grilled dourada, and no ginjinha for 48 hours."
+      ]
+    },
+    "foodie": {
+      "mustEat": [
+        {"name": "Pastéis de Belém", "cuisine": "the original custard tart", "perPersonUsd": 4.0, "rating": 4.8, "suits": ["vegetarian"], "url": "https://pasteisdebelem.pt/"},
+        {"name": "Cervejaria Ramiro", "cuisine": "garlic prawns, the prego to finish", "perPersonUsd": 45.0, "rating": 4.5, "suits": [], "url": "https://www.cervejariaramiro.com/"},
+        {"name": "O Trevo", "cuisine": "the bifana, standing", "perPersonUsd": 5.0, "rating": 4.4, "suits": [], "url": "https://www.timeout.com/lisbon/restaurants"},
+        {"name": "A Ginjinha", "cuisine": "sour-cherry liqueur in a shot glass by Rossio", "perPersonUsd": 2.0, "rating": 4.5, "suits": ["vegetarian"], "url": "https://www.timeout.com/lisbon"}
+      ],
+      "dishes": ["pastel de nata", "bacalhau à Brás", "bifana", "grilled sardines", "arroz de pato", "ginjinha"]
+    },
+    "reviews": {
+      "averageRating": 4.6,
+      "praise": ["the light on the river at 6pm", "the food, and the price of the food", "how kind people are when you attempt Portuguese"],
+      "complaints": ["the hills, always the hills", "tram 28 at noon is a sardine tin with pickpockets", "Alfama's cobbles versus any wheel"]
+    },
+    "accessibility": {
+      "transit": ["Metro: lifts at Baixa-Chiado, Terreiro do Paço, Cais do Sodré, Oriente; avoid the Green line north of Rossio.", "Tram 15E to Belém is a modern low-floor tram; the 28 is a museum piece with steps.", "Bolt and Uber vans on request; taxis rank at Rossio."],
+      "lodging": ["Baixa and Chiado hotels have lifts and flat approaches.", "Alfama and Graça lodging is charming and unreachable with wheels."],
+      "attractions": ["Museu do Azulejo ground floor, Jerónimos nave, LX Factory, Parque das Nações riverside, the Santa Justa lift as a shortcut to Carmo."],
+      "warnings": ["Castelo de São Jorge: steep cobbles throughout, one step-free viewpoint.", "Pena Palace: the bus stops below; the last 400 metres climb.", "Cobbles are limestone and slick when wet, which on the storm day is everywhere."]
+    },
+    "next": {
+      "ideas": [
+        {"name": "Porto and the Douro", "why": "The tile and the food, with port wine and a river valley thrown in; the train from Lisbon is three hours.", "bestSeason": "September to October", "estimatedDailyUsd": 170.0},
+        {"name": "Seville", "why": "Moorish architecture for Priya, tapas for Marco, and a flat old town for Dee.", "bestSeason": "October to April", "estimatedDailyUsd": 180.0},
+        {"name": "The Azores", "why": "Volcanic pools and a rooftop of cloud; the pool day, but for a week.", "bestSeason": "June to September", "estimatedDailyUsd": 150.0}
+      ]
+    },
+    "plan": {
+      "title": "Seven Hills, Three Friends, One Pool",
+      "plan": "<h4>The idea</h4><p>Lisbon rewards a party that agrees to disagree. Marco eats, Priya looks up, Dee finds a rooftop, and every evening you meet at the river. Baixa is home: flat, lifted, ten minutes from everything.</p><h4>The days</h4><ul><li><b>Sat 3</b> Land at 09:30, drop bags at Hotel da Baixa, first pastel de nata by 11. Easy afternoon; the Azulejo museum's ground floor and its cloister café.</li><li><b>Sun 4</b> Belém by the 15E: Jerónimos, the river walk, the original pastéis. Dinner at Taberna da Rua das Flores.</li><li><b>Mon 5</b> LX Factory brunch and books; Time Out Market for Marco's pilgrimage before the crowd.</li><li><b>Tue 6</b> Alfama the clever way: tram 28 up early, miradouros, Santa Justa lift down. Ramiro for the eaters, Ao 26 for Priya.</li><li><b>Wed 7</b> Sintra by train; Pena Palace; back for ginjinha at Rossio.</li><li><b>Thu 8</b> Dee's day: pool, rooftop, one gentle dinner at Prado.</li><li><b>Fri 9</b> Last nata, 12:40 flight.</li></ul><h4>A story</h4><p>Fernando Pessoa drank his coffee at A Brasileira in Chiado every day for years, writing under seventy-odd names; the bronze Pessoa outside is the most photographed man in the city and the only one who never moved.</p>",
+      "days": [
+        {"date": "2026-10-03", "locationAndCountry": "Lisbon,+Portugal", "summary": "arrive, Baixa, Azulejo museum"},
+        {"date": "2026-10-04", "locationAndCountry": "Lisbon,+Portugal", "summary": "Belém"},
+        {"date": "2026-10-05", "locationAndCountry": "Lisbon,+Portugal", "summary": "LX Factory, Time Out Market"},
+        {"date": "2026-10-06", "locationAndCountry": "Lisbon,+Portugal", "summary": "Alfama by tram and lift"},
+        {"date": "2026-10-07", "locationAndCountry": "Sintra,+Portugal", "summary": "Sintra and Pena Palace"},
+        {"date": "2026-10-08", "locationAndCountry": "Lisbon,+Portugal", "summary": "pool day"},
+        {"date": "2026-10-09", "locationAndCountry": "Lisbon,+Portugal", "summary": "fly home"}
+      ],
+      "countriesVisited": ["Portugal"]
+    },
+
+    "danger": {"danger": 10, "themes": ["ordinary tourism"]},
+    "danger:news:travel safety": {"danger": 12, "themes": ["record tourism", "pickpockets on tram 28", "weather"]},
+    "danger:video:travel safety": {"danger": 18, "themes": ["pickpocket warnings", "crowds"]},
+    "danger:social:travel safety": {"danger": 22, "themes": ["crowds", "steep streets", "scams near Rossio"]},
+    "danger:news:protest unrest": {"danger": 55, "themes": ["large demonstration", "road closures in Baixa", "transport strike announced"]},
+    "danger:video:protest unrest": {"danger": 78, "themes": ["police lines", "crowds filling Rossio", "stranded tourists"]},
+    "danger:social:protest unrest": {"danger": 48, "themes": ["peaceful march", "avoid the route", "metro strike Thursday"]}
+  }
+}
