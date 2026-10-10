@@ -115,9 +115,8 @@ public final class PartyBus {
         Peer concierge = seat.apply("concierge");
         concierge.bind(new Dispatcher());
         concierge.bind(new Assemblers.StayFinder());
-        concierge.run(Assemblers.runPlanAssembler(concierge.space(PartyBusFleet.RESEARCH),
-                concierge.space(PartyBusFleet.TRIP), sources));
-        concierge.bind(new SafetyPanel.Lead(concierge.vote(PartyBusFleet.ADVISORIES), "safety-lead"));
+        concierge.bind(new Assemblers.PlanAssembler(sources));
+        concierge.bind(new SafetyPanel.Lead("safety-lead"));
 
         // The scouts and advisors: the research bag's workers, four to a peer.
         Peer scoutsA = seat.apply("scouts-a");
@@ -166,7 +165,7 @@ public final class PartyBus {
             seatOf.bind(new Party.TravelerAgent(traveler, stamina[i], seatOf.aggregate()));
         }
         Peer bus = seat.apply("the-bus");
-        bus.bind(new Party.Lead(bus.vote(PartyBusFleet.DECISIONS), party.travelers().size()));
+        bus.bind(new Party.Lead(party.travelers().size()));
 
         // The booking desk: three clerks, one Raft quorum.
         List<Peer> clerks = List.of(seat.apply("clerk-a"), seat.apply("clerk-b"),

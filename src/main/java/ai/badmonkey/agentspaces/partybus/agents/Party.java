@@ -20,6 +20,7 @@ import ai.badmonkey.agentspaces.agent.annotation.Ballot;
 import ai.badmonkey.agentspaces.agent.annotation.OnDecision;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceNotify;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceRef;
+import ai.badmonkey.agentspaces.agent.capability.Motion;
 import ai.badmonkey.agentspaces.api.space.Lease;
 import ai.badmonkey.agentspaces.api.space.Space;
 import ai.badmonkey.agentspaces.api.space.Template;
@@ -168,29 +169,35 @@ public final class Party {
     @AgentSpec(name = "party-lead", description = "Puts the next destination to a vote",
             goals = {"decide together"})
     public static final class Lead {
-        private final VoteCapability vote;
         private final int partySize;
-        private final Set<String> proposed = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        @SpaceRef(DECISIONS)
+        Space decisions;
 
-        public Lead(VoteCapability vote, int partySize) {
-            this.vote = Objects.requireNonNull(vote, "vote");
+        public Lead(int partySize) {
             this.partySize = partySize;
         }
 
-        @SpaceNotify(space = Scouts.SPACE, lease = "12h", resultSpace = DECISIONS, resultLease = "12h")
-        public NextDestinationProposal open(NextDestinationIdeas ideas) {
+        /**
+         * The options come from the cue (the advisor's ideas), so this is the
+         * dynamic form: the method returns the {@link Motion} and the binder opens
+         * it once per proposal id (ISSUE-Motion). The human-readable announcement
+         * is a second entry, written through the handle, since one return
+         * carries one value.
+         */
+        @SpaceNotify(space = Scouts.SPACE, lease = "12h")
+        public Motion open(NextDestinationIdeas ideas) {
             String proposalId = "next:" + ideas.tripId();
-            if (!proposed.add(proposalId)) {
-                return null;
-            }
             List<String> options = new ArrayList<>();
             for (Destination idea : ideas.ideas()) {
                 options.add(idea.name());
             }
-            vote.propose(proposalId, "Where next after this trip?", options, partySize,
+            if (decisions.read(Template.of(NextDestinationProposal.class)
+                    .where("proposalId", eq(proposalId))).isEmpty()) {
+                decisions.write(new NextDestinationProposal(ideas.tripId(), proposalId,
+                        "Where next after this trip?", options, "party-lead"), Lease.of(Duration.ofHours(12)));
+            }
+            return Motion.in(DECISIONS, proposalId, "Where next after this trip?", options, partySize,
                     Lease.of(Duration.ofHours(12)));
-            return new NextDestinationProposal(ideas.tripId(), proposalId,
-                    "Where next after this trip?", options, "party-lead");
         }
 
         @OnDecision(space = DECISIONS, prefix = "next:", resultSpace = TRIP, resultLease = "12h",

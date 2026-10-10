@@ -30,6 +30,7 @@ import java.util.Map;
 import ai.badmonkey.agentspaces.agent.annotation.AgentSpec;
 import ai.badmonkey.agentspaces.agent.annotation.Ballot;
 import ai.badmonkey.agentspaces.agent.annotation.OnDecision;
+import ai.badmonkey.agentspaces.agent.annotation.Propose;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceNotify;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceRef;
 import java.util.Objects;
@@ -150,28 +151,29 @@ public final class SafetyPanel {
     @AgentSpec(name = "safety-lead", description = "Opens panel votes and publishes advisories",
             goals = {"advise"})
     public static final class Lead {
-        private final VoteCapability vote;
         private final String leadName;
-        private final Set<String> proposed = java.util.concurrent.ConcurrentHashMap.newKeySet();
         private final Map<String, DangerAssessment> waves = new java.util.concurrent.ConcurrentHashMap<>();
         @SpaceRef(Watchers.SIGNALS)
         Space signals;
 
-        public Lead(VoteCapability vote, String leadName) {
-            this.vote = Objects.requireNonNull(vote, "vote");
+        public Lead(String leadName) {
             this.leadName = Objects.requireNonNull(leadName, "leadName");
         }
 
-        @SpaceNotify(space = Watchers.SIGNALS, lease = "12h")
-        public void open(DangerAssessment assessment) {
-            String proposalId = Safety.proposalId(assessment.tripId(), assessment.location(),
-                    assessment.wave());
-            waves.putIfAbsent(proposalId, assessment);
-            if (proposed.add(proposalId) && vote.proposal(proposalId).isEmpty()) {
-                vote.propose(proposalId, "Travel advisory for " + assessment.location()
-                        + " (" + assessment.wave() + ")", Safety.VERDICTS, SEATS.size(),
-                        Lease.of(Duration.ofHours(12)));
-            }
+        /**
+         * One vote per wave, as one annotation (ISSUE-Propose): the id is the
+         * prefix plus {@code tripId:location:wave}, the format
+         * {@link Safety#proposalId} has always used, so every channel's
+         * assessment of one wave maps to one proposal and the binder invokes
+         * this once per wave, opens once, and skips the rest.
+         */
+        @Propose(space = Watchers.SIGNALS, vote = ADVISORIES, prefix = PROPOSAL_PREFIX,
+                key = {"tripId", "location", "wave"}, options = {"GO", "CAUTION", "AVOID"}, quorum = 3,
+                lease = "12h", subscriptionLease = "12h")
+        public String open(DangerAssessment assessment) {
+            waves.putIfAbsent(Safety.proposalId(assessment.tripId(), assessment.location(),
+                    assessment.wave()), assessment);
+            return "Travel advisory for " + assessment.location() + " (" + assessment.wave() + ")";
         }
 
         @OnDecision(space = ADVISORIES, prefix = PROPOSAL_PREFIX, resultSpace = Party.TRIP,

@@ -16,6 +16,9 @@
 package ai.badmonkey.agentspaces.partybus.agents;
 
 import ai.badmonkey.agentspaces.agent.annotation.AgentSpec;
+import ai.badmonkey.agentspaces.agent.annotation.Part;
+import ai.badmonkey.agentspaces.agent.annotation.SpaceJoin;
+import ai.badmonkey.agentspaces.agent.join.Joined;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceNotify;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceRef;
 import ai.badmonkey.agentspaces.agent.annotation.OrderedTake;
@@ -47,13 +50,11 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
 import static ai.badmonkey.agentspaces.partybus.agents.Prompts.PLANNER;
@@ -90,50 +91,48 @@ public final class Assemblers {
      * @param sources  the model that writes the plan
      * @return a handle; close it to stop the assembler
      */
-    public static AutoCloseable runPlanAssembler(Space research, Space trip, Sources sources) {
-        Thread thread = Thread.ofVirtual().name("plan-assembler").start(() -> {
-            Set<String> assembled = new HashSet<>();
-            while (!Thread.currentThread().isInterrupted()) {
-                for (TravelBrief brief : trip.readAll(Template.of(TravelBrief.class), 20)) {
-                    String id = brief.tripId();
-                    if (assembled.contains(id)) {
-                        continue;
-                    }
-                    Optional<SightseeingOptions> sights = first(research, SightseeingOptions.class, id);
-                    Optional<HotelOptions> hotels = first(research, HotelOptions.class, id);
-                    Optional<RestaurantOptions> tables = first(research, RestaurantOptions.class, id);
-                    Optional<FoodieOptions> foodie = first(research, FoodieOptions.class, id);
-                    Optional<FlightOptions> flights = first(research, FlightOptions.class, id);
-                    if (sights.isEmpty() || hotels.isEmpty() || tables.isEmpty()
-                            || foodie.isEmpty() || flights.isEmpty()) {
-                        continue;
-                    }
-                    Travelers party = trip.read(Template.of(Travelers.class)
-                            .where("tripId", eq(id))).orElse(new Travelers(id, List.of()));
-                    ProposedTravelPlan drafted = sources.structured("plan", PLANNER + "\n"
-                            + "Write the plan for this brief as HTML starting at <h4>, in 500 "
-                            + "words or fewer, with a catchy title, one Day entry per date in "
-                            + "'City,+Country' form, and the countries visited.\n<brief>"
-                            + brief.contribution() + "</brief>\n" + party.contribution()
-                            + "\nPoints of interest: " + sights.get().pointsOfInterest()
-                            + "\nHotels: " + hotels.get().options()
-                            + "\nRestaurants: " + tables.get().restaurants()
-                            + "\nMust eat: " + foodie.get().dishes()
-                            + "\nFlights: " + flights.get().options(), ProposedTravelPlan.class);
-                    List<Day> days = drafted.days().isEmpty() ? defaultDays(brief) : drafted.days();
-                    trip.write(new ProposedTravelPlan(id, drafted.title(), drafted.plan(), days,
-                            drafted.countriesVisited(), "plan-assembler"),
-                            Lease.of(Duration.ofHours(12)));
-                    assembled.add(id);
-                }
-                SafetyPanel.sleep(250);
-            }
-        });
-        return thread::interrupt;
-    }
+    /**
+     * The plan assembler as one join (issue #16): a brief in the trip space and
+     * five research results in the research space, keyed by the trip id, fire
+     * once per trip when all are present; the party roster is optional. This
+     * replaced a virtual-thread loop over every brief with an {@code assembled}
+     * set, five reads per brief, and a sleep.
+     */
+    @AgentSpec(name = "plan-assembler",
+            description = "Drafts the trip plan once the scouts' research is in",
+            goals = {"draft the plan"})
+    public static final class PlanAssembler {
+        private final Sources sources;
 
-    private static <T> Optional<T> first(Space space, Class<T> type, String tripId) {
-        return space.read(Template.of(type).where("tripId", eq(tripId)));
+        public PlanAssembler(Sources sources) {
+            this.sources = Objects.requireNonNull(sources, "sources");
+        }
+
+        @SpaceJoin(space = Party.TRIP, key = "tripId", resultLease = "12h",
+                parts = {@Part(TravelBrief.class),
+                         @Part(value = SightseeingOptions.class, space = Scouts.SPACE),
+                         @Part(value = HotelOptions.class, space = Scouts.SPACE),
+                         @Part(value = RestaurantOptions.class, space = Scouts.SPACE),
+                         @Part(value = FoodieOptions.class, space = Scouts.SPACE),
+                         @Part(value = FlightOptions.class, space = Scouts.SPACE),
+                         @Part(value = Travelers.class, optional = true)})
+        public ProposedTravelPlan assemble(Joined j) {
+            TravelBrief brief = j.get(TravelBrief.class);
+            Travelers party = j.find(Travelers.class).orElse(new Travelers(j.key(), List.of()));
+            ProposedTravelPlan drafted = sources.structured("plan", PLANNER + "\n"
+                    + "Write the plan for this brief as HTML starting at <h4>, in 500 "
+                    + "words or fewer, with a catchy title, one Day entry per date in "
+                    + "'City,+Country' form, and the countries visited.\n<brief>"
+                    + brief.contribution() + "</brief>\n" + party.contribution()
+                    + "\nPoints of interest: " + j.get(SightseeingOptions.class).pointsOfInterest()
+                    + "\nHotels: " + j.get(HotelOptions.class).options()
+                    + "\nRestaurants: " + j.get(RestaurantOptions.class).restaurants()
+                    + "\nMust eat: " + j.get(FoodieOptions.class).dishes()
+                    + "\nFlights: " + j.get(FlightOptions.class).options(), ProposedTravelPlan.class);
+            List<Day> days = drafted.days().isEmpty() ? defaultDays(brief) : drafted.days();
+            return new ProposedTravelPlan(j.key(), drafted.title(), drafted.plan(), days,
+                    drafted.countriesVisited(), "plan-assembler");
+        }
     }
 
     private static List<Day> defaultDays(TravelBrief brief) {
