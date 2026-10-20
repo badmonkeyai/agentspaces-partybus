@@ -21,7 +21,7 @@
 
   <groupId>ai.badmonkey.agentspaces.partybus</groupId>
   <artifactId>agentspaces-partybus</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <name>AgentSpaces Party Bus :: Travel Fleet</name>
   <description>
     Party Bus takes the Embabel travel planner (Tripper) and rebuilds it as a
@@ -40,7 +40,7 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <agentspaces.version>0.3.0</agentspaces.version>
+    <agentspaces.version>0.4.0</agentspaces.version>
     <junit.version>5.13.4</junit.version>
     <assertj.version>3.27.7</assertj.version>
     <embabel-agent.version>1.5.2</embabel-agent.version>
