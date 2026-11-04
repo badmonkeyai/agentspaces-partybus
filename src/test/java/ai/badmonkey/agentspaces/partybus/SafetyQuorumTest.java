@@ -57,7 +57,7 @@ class SafetyQuorumTest {
     void theSafetyPanelReachesAQuorumDecisionAndPublishesAnAdvisory() throws Exception {
         RecordedSources sources = RecordedSources.lisbon();
         int base;
-        try (ServerSocket probe = new ServerSocket(0)) {
+        try (ServerSocket probe = new ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
             base = probe.getLocalPort();
         }
         PartyBus.Seating bus = PartyBus.board(sources, base, 0);

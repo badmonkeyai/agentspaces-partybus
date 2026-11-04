@@ -322,7 +322,7 @@ class PartyBusFleetTest {
     private static int freePortBlock(int size) throws IOException {
         for (int attempt = 0; attempt < 50; attempt++) {
             int base;
-            try (ServerSocket socket = new ServerSocket(0)) {
+            try (ServerSocket socket = new ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
                 base = socket.getLocalPort();
             }
             boolean free = true;
