@@ -28,6 +28,7 @@ import ai.badmonkey.agentspaces.partybus.domain.Research.RestaurantOptions;
 import ai.badmonkey.agentspaces.partybus.domain.Research.SightseeingOptions;
 import ai.badmonkey.agentspaces.partybus.domain.Trip.PointOfInterest;
 
+import java.time.Duration;
 import java.util.List;
 
 import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
@@ -51,7 +52,10 @@ import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
  * hands. That is the whole scheduler.
  *
  * <p>Every planner carries a {@code @SpaceRef} to the research space so its
- * schedule names real places the scouts found rather than a placeholder.
+ * schedule names real places the scouts found rather than a placeholder. The
+ * week is auctioned the moment the brief is written, so a planner whose title
+ * needs a scout's result waits a bounded time for it (the photo walk waits for
+ * the curated set) instead of planning against an empty bag.
  */
 public final class Planners {
 
@@ -163,10 +167,14 @@ public final class Planners {
             return bid + slot.round() * 50; // rain and a camera do not mix
         }
 
+        /** How long the walk waits for the photo curator: the slots are auctioned before the scouts answer. */
+        static final Duration PHOTO_SET_WAIT = Duration.ofSeconds(5);
+
         @SpaceTake(space = SLOTS, lease = "1m", pollTimeout = "500ms")
         public ScheduledActivity plan(DaySlot slot) {
-            int shots = research.readAll(Template.of(PhotoSet.class)
-                            .where("tripId", eq(slot.tripId())), 10).stream()
+            Template<PhotoSet> photos = Template.of(PhotoSet.class).where("tripId", eq(slot.tripId()));
+            research.read(photos, PHOTO_SET_WAIT);
+            int shots = research.readAll(photos, 10).stream()
                     .mapToInt(p -> p.images().size()).sum();
             return new ScheduledActivity(slot.tripId(), slot.date(), slot.location(),
                     "PHOTO_WALK", "Golden-hour walk with a " + shots + "-shot list", bid(slot),

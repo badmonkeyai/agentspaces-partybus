@@ -273,6 +273,9 @@ class PartyBusFleetTest {
             // The storm day changed hands to an indoor planner; the party's energy bought a rest day.
             List<ScheduledActivity> after = slots.readAll(Template.of(ScheduledActivity.class)
                     .where("tripId", eq(TRIP)), 200);
+            // The photo walk waited for the curator's set: no walk was planned with an empty shot list.
+            assertThat(after.stream().filter(a -> a.kind().equals("PHOTO_WALK")).toList())
+                    .isNotEmpty().noneMatch(a -> a.title().contains(" 0-shot"));
             assertThat(after.stream().filter(a -> a.date().equals(brief.days().get(1)))
                     .max((a, b) -> Integer.compare(a.round(), b.round())).orElseThrow().kind())
                     .isEqualTo("DINING");
