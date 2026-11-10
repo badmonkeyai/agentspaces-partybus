@@ -85,7 +85,7 @@ while the demo runs (operator token `partybus-operator`): HAL+JSON under
 Party Bus panels (itinerary, advisories, bookings, energy, event responses,
 the plan) and commands (start a trip, throw an event, reroute the party).
 
-The project depends on the AgentSpaces libraries at `0.2.0`. From a
+The project depends on the AgentSpaces libraries at `0.6.0`. From a
 clone of the main repository:
 
 ```
