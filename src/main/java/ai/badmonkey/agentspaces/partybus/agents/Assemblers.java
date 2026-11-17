@@ -20,6 +20,7 @@ import ai.badmonkey.agentspaces.agent.annotation.Part;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceJoin;
 import ai.badmonkey.agentspaces.agent.join.Joined;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceNotify;
+import ai.badmonkey.agentspaces.agent.annotation.SpaceReduce;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceRef;
 import ai.badmonkey.agentspaces.agent.annotation.OrderedTake;
 import ai.badmonkey.agentspaces.api.space.Lease;
@@ -29,7 +30,10 @@ import ai.badmonkey.agentspaces.api.space.Template;
 import ai.badmonkey.agentspaces.capabilities.orderedlog.OrderedTakes;
 import ai.badmonkey.agentspaces.capabilities.orderedlog.RaftLog;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingConfirmation;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingOrder;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DayPlan;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
 import ai.badmonkey.agentspaces.partybus.domain.Research.FlightOptions;
 import ai.badmonkey.agentspaces.partybus.domain.Research.FoodieOptions;
 import ai.badmonkey.agentspaces.partybus.domain.Research.HotelOption;
@@ -72,11 +76,12 @@ import static ai.badmonkey.agentspaces.partybus.agents.Prompts.PLANNER;
  * panel's advisory, and writes one {@link BookingOrder} per stay. The
  * {@link BookingClerk}s take those orders through {@code aspace:cap/ordered-log}
  * so that a reservation (real money) is confirmed by exactly one clerk, even
- * when three are racing for it.
+ * when three are racing for it. The {@link ItineraryKeeper}s fold the planners'
+ * proposals into one plan per day through the same log.
  */
 public final class Assemblers {
 
-    /** The space bookings live in. */
+    /** The space bookings and the itinerary's day plans live in: both commit through the ordered log. */
     public static final String BOOKINGS = "bookings";
 
     private Assemblers() {
@@ -224,6 +229,30 @@ public final class Assemblers {
         public BookingConfirmation confirm(BookingOrder order) {
             return new BookingConfirmation(order.tripId(), order.orderId(),
                     confirmationCode(order, clerk), order.amountUsd(), clerk, raft.commitIndex());
+        }
+    }
+
+    /**
+     * An itinerary keeper: commits each day's plan through the log. The planners' auction
+     * routes a day to the cheapest planner, but only within its settle window; a claim later
+     * than that leaves two planners that each planned the same round of a day (SPEC §7.4). A
+     * schedule the whole party reads must have one plan per day at all times, so the plan is
+     * an accumulator per day, {@link DayPlan}, and every proposal is folded into it by an
+     * {@code ORDERED} reduce: the ticket, each proposal, and each retired plan are taken
+     * through the bookings log, so one keeper folds a day at a time, every proposal is folded
+     * once, and every replica holds the same plan. The keepers sit at the booking desk because
+     * the desk's log is already there; any one of them may fold any day, and different days
+     * fold at once.
+     */
+    @AgentSpec(name = "itinerary-keeper", description = "Commits one plan per day of the trip",
+            goals = {"keep the itinerary"})
+    public static final class ItineraryKeeper {
+
+        @SpaceReduce(space = BOOKINGS, name = Itinerary.ITINERARY, keyTag = Itinerary.DAY_TAG,
+                mode = SpaceReduce.Mode.ORDERED, lease = "30s", pollTimeout = "1s",
+                accumulatorLease = "12h", description = "Folds a planner's proposal into the day's plan")
+        public DayPlan commit(DayPlan day, ScheduledActivity proposal) {
+            return DayPlan.fold(day, proposal);
         }
     }
 

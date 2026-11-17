@@ -15,6 +15,7 @@
  */
 package ai.badmonkey.agentspaces.partybus.fleet;
 
+import ai.badmonkey.agentspaces.agent.reduce.Reductions;
 import ai.badmonkey.agentspaces.api.space.Lease;
 import ai.badmonkey.agentspaces.api.space.Space;
 import ai.badmonkey.agentspaces.api.space.Template;
@@ -27,6 +28,7 @@ import ai.badmonkey.agentspaces.console.FleetConsoleServer;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingConfirmation;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingOrder;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DayPlan;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DaySlot;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.EnergyReport;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.PartyDecision;
@@ -101,10 +103,10 @@ public final class Turret implements AutoCloseable {
                         Research.HospitalRequest.class, Research.NextDestinationRequest.class,
                         Safety.NewsSweep.class, Safety.VideoSweep.class, Safety.SocialSweep.class)
                 .space(PartyBusFleet.SLOTS, peer.space(PartyBusFleet.SLOTS), DaySlot.class)
-                .results(PartyBusFleet.SLOTS, ScheduledActivity.class,
-                        a -> ((ScheduledActivity) a).plannedBy())
                 .space(PartyBusFleet.BOOKINGS, peer.space(PartyBusFleet.BOOKINGS),
                         BookingOrder.class)
+                .results(PartyBusFleet.BOOKINGS, DayPlan.class,
+                        d -> ((DayPlan) d).plan().plannedBy())
                 .results(PartyBusFleet.BOOKINGS, BookingConfirmation.class,
                         c -> ((BookingConfirmation) c).clerk())
                 .members(() -> peer.runtime().membership().allMembers())
@@ -345,21 +347,23 @@ public final class Turret implements AutoCloseable {
         };
     }
 
-    /** The itinerary: the winning activity per day, latest round first. */
+    /** The itinerary: each day's one plan, as the ordered fold committed it, the same on every replica. */
     static ConsolePanel itineraryPanel(PartyBusFleet.Peer peer) {
-        Space slots = peer.space(PartyBusFleet.SLOTS);
-        return panel("itinerary", "Itinerary (auction winners)", () -> {
-            Map<String, ScheduledActivity> byDay = new java.util.TreeMap<>();
-            for (ScheduledActivity a : slots.readAll(Template.of(ScheduledActivity.class), 200)) {
-                ScheduledActivity current = byDay.get(a.date());
-                if (current == null || a.round() > current.round()) {
-                    byDay.put(a.date(), a);
-                }
+        Space bookings = peer.space(PartyBusFleet.BOOKINGS);
+        return panel("itinerary", "Itinerary (auction winners, committed through the log)", () -> {
+            Map<String, DayPlan> byDay = new java.util.TreeMap<>();
+            for (Space.Entry<DayPlan> entry : bookings.readAllEntries(Template.of(DayPlan.class)
+                    .whereTag(Reductions.REDUCE_TAG, eq(Itinerary.ITINERARY)), 200)) {
+                // A fold writes the day's new plan, then retires the old one: show the newest.
+                byDay.merge(entry.value().tripId() + " " + entry.value().date(), entry.value(),
+                        (a, b) -> b.proposals() > a.proposals() ? b : a);
             }
             List<Map<String, Object>> rows = new ArrayList<>();
-            for (ScheduledActivity a : byDay.values()) {
+            for (DayPlan day : byDay.values()) {
+                ScheduledActivity a = day.plan();
                 rows.add(row("date", a.date(), "kind", a.kind(), "title", a.title(),
-                        "plannedBy", a.plannedBy(), "bid", a.costUsd(), "round", a.round()));
+                        "plannedBy", a.plannedBy(), "bid", a.costUsd(), "round", a.round(),
+                        "secondPlans", day.duplicates()));
             }
             return rows;
         });

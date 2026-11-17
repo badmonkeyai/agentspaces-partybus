@@ -26,8 +26,6 @@ import ai.badmonkey.agentspaces.partybus.sources.RecordedSources;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -56,33 +54,29 @@ class SafetyQuorumTest {
     @Timeout(240)
     void theSafetyPanelReachesAQuorumDecisionAndPublishesAnAdvisory() throws Exception {
         RecordedSources sources = RecordedSources.lisbon();
-        int base;
-        try (ServerSocket probe = new ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
-            base = probe.getLocalPort();
-        }
-        PartyBus.Seating bus = PartyBus.board(sources, base, 0);
+        PartyBus.Seating bus = TestPorts.board(sources);
         try {
             Peer turret = bus.turretPeer();
             Space trip = turret.space(PartyBusFleet.TRIP);
             Space signals = turret.space(PartyBusFleet.SIGNALS);
             Space advisories = turret.space(PartyBusFleet.ADVISORIES);
-            Thread.sleep(2500);
+            Waits.formed(turret, bus.peers());
 
             trip.write(PartyBus.party(TRIP), Lease.of(Duration.ofHours(1)));
             trip.write(PartyBus.brief(TRIP), Lease.of(Duration.ofHours(1)));
 
             // The chain, step by step, so a future stall names its own stage.
-            assertThat(await(() -> first(signals, Safety.SignalReport.class)))
+            assertThat(await("partybus.safety.signal", () -> first(signals, Safety.SignalReport.class)))
                     .as("the watchers swept and reported").isPresent();
-            assertThat(await(() -> first(signals, Safety.DangerAssessment.class)))
+            assertThat(await("partybus.safety.danger", () -> first(signals, Safety.DangerAssessment.class)))
                     .as("the analyst scored a report").isPresent();
-            assertThat(await(() -> first(advisories, VoteCapability.Proposal.class)))
+            assertThat(await("partybus.safety.proposal", () -> first(advisories, VoteCapability.Proposal.class)))
                     .as("the safety lead opened a proposal").isPresent();
-            assertThat(await(() -> first(advisories, VoteCapability.Ballot.class)))
+            assertThat(await("partybus.safety.ballot", () -> first(advisories, VoteCapability.Ballot.class)))
                     .as("a panelist cast a ballot").isPresent();
 
             // Three distinct voters, so the three-seat quorum can close.
-            assertThat(await(() -> {
+            assertThat(await("partybus.safety.ballots", () -> {
                 List<VoteCapability.Ballot> all = advisories.readAll(
                         Template.of(VoteCapability.Ballot.class), 100);
                 return all.size() >= 3 ? Optional.of(all) : Optional.empty();
@@ -93,7 +87,7 @@ class SafetyQuorumTest {
 
             // A Decision is computed from the tally, never written as an entry;
             // the advisory the lead publishes is the observable proof it closed.
-            Optional<Safety.TravelAdvisory> advisory = await(() ->
+            Optional<Safety.TravelAdvisory> advisory = await("partybus.safety.advisory", () ->
                     trip.readAll(Template.of(Safety.TravelAdvisory.class)
                             .where("tripId", eq(TRIP))
                             .where("wave", eq(Safety.BASELINE)), 10).stream().findFirst());
@@ -112,15 +106,8 @@ class SafetyQuorumTest {
         return space.readAll(Template.of(type), 200).stream().findFirst();
     }
 
-    private static <T> Optional<T> await(Supplier<Optional<T>> probe) throws InterruptedException {
-        long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
-        while (System.nanoTime() < deadline) {
-            Optional<T> value = probe.get();
-            if (value.isPresent()) {
-                return value;
-            }
-            Thread.sleep(250);
-        }
-        return probe.get();
+    /** A measured wait under the 60 s ceiling these stages always had. */
+    private static <T> Optional<T> await(String metric, Supplier<Optional<T>> probe) {
+        return Waits.await(metric, probe, Duration.ofSeconds(60));
     }
 }

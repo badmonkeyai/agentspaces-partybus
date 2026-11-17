@@ -194,17 +194,30 @@ public final class PartyBusPlanner {
         return steps;
     }
 
-    /** The generated agent's {@code @Action} methods as steps. */
+    /**
+     * The generated agent's {@code @Action} methods as steps.
+     *
+     * <p>A generated action takes its input entry first. When Embabel is on the
+     * classpath the bridge also gives it Embabel's {@code OperationContext}, which
+     * the GOAP planner supplies itself and never plans on, so this planner reads
+     * the first parameter as the step's input, as Embabel does. It has no Embabel
+     * process to hand over, so it passes null there; the bridge then runs the
+     * remote action directly, without the per-process dedup a context enables.
+     */
     public static List<Step> fleetSteps(Object fleetAgent) {
         List<Step> steps = new ArrayList<>();
         for (Method method : fleetAgent.getClass().getDeclaredMethods()) {
-            if (method.getParameterCount() != 1 || !isAction(method)) {
+            if (method.getParameterCount() < 1 || !isAction(method)
+                    || !onlyFrameworkSuppliedAfterInput(method)) {
                 continue;
             }
+            int arity = method.getParameterCount();
             steps.add(new Step(method.getName(), method.getParameterTypes()[0],
                     method.getReturnType(), input -> {
+                Object[] arguments = new Object[arity];
+                arguments[0] = input;
                 try {
-                    return method.invoke(fleetAgent, input);
+                    return method.invoke(fleetAgent, arguments);
                 } catch (ReflectiveOperationException e) {
                     Throwable cause = e.getCause() != null ? e.getCause() : e;
                     throw new IllegalStateException(method.getName() + " failed: "
@@ -213,6 +226,24 @@ public final class PartyBusPlanner {
             }));
         }
         return steps;
+    }
+
+    /** Embabel's context type, named so this class loads without Embabel present. */
+    private static final String OPERATION_CONTEXT = "com.embabel.agent.api.common.OperationContext";
+
+    /**
+     * Whether every parameter after the input is one the framework supplies. Any
+     * other extra parameter would be a second domain input this planner cannot
+     * chain, so such a method is left out rather than called with a null input.
+     */
+    private static boolean onlyFrameworkSuppliedAfterInput(Method method) {
+        Class<?>[] parameters = method.getParameterTypes();
+        for (int i = 1; i < parameters.length; i++) {
+            if (!parameters[i].getName().equals(OPERATION_CONTEXT)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isAction(Method method) {

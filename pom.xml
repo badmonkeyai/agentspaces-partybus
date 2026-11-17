@@ -21,7 +21,7 @@
 
   <groupId>ai.badmonkey.agentspaces.partybus</groupId>
   <artifactId>agentspaces-partybus</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0-SNAPSHOT</version>
   <name>AgentSpaces Party Bus :: Travel Fleet</name>
   <description>
     Party Bus takes the Embabel travel planner (Tripper) and rebuilds it as a
@@ -40,7 +40,7 @@
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <agentspaces.version>0.6.0</agentspaces.version>
+    <agentspaces.version>0.7.0-SNAPSHOT</agentspaces.version>
     <junit.version>5.13.4</junit.version>
     <assertj.version>3.27.7</assertj.version>
     <embabel-agent.version>1.5.2</embabel-agent.version>
@@ -161,6 +161,13 @@
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <version>${assertj.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Measured waits: each liveness wait records how long it took (srad/feature-measurements.md). -->
+    <dependency>
+      <groupId>ai.badmonkey.agentspaces</groupId>
+      <artifactId>agentspaces-test-measure</artifactId>
+      <version>${agentspaces.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

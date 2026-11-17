@@ -22,7 +22,7 @@ import ai.badmonkey.agentspaces.api.space.Lease;
 import ai.badmonkey.agentspaces.api.space.Space;
 import ai.badmonkey.agentspaces.api.space.Template;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DaySlot;
-import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Research.AccessibilityRequest;
 import ai.badmonkey.agentspaces.partybus.domain.Research.CarRequest;
 import ai.badmonkey.agentspaces.partybus.domain.Research.DietRequest;
@@ -76,6 +76,8 @@ public final class Dispatcher {
     Space trip;
     @SpaceRef(Planners.SLOTS)
     Space slots;
+    @SpaceRef(Assemblers.BOOKINGS)
+    Space bookings;
 
     /** Fan a brief out into the bag, the sweeps, and the auction. */
     @SpaceNotify(space = Party.TRIP, lease = "12h")
@@ -173,11 +175,9 @@ public final class Dispatcher {
     private void reauction(String tripId, String date) {
         Optional<TravelBrief> brief = trip.read(Template.of(TravelBrief.class)
                 .where("tripId", eq(tripId)));
-        // Filled slots become ScheduledActivity results in the same space; the
-        // next round is one past the highest round already scheduled for the day.
-        int round = slots.readAll(Template.of(ScheduledActivity.class).where("tripId", eq(tripId))
-                .where("date", eq(date)), 10).stream().mapToInt(ScheduledActivity::round).max()
-                .orElse(0) + 1;
+        // A filled slot becomes a proposal the itinerary keepers fold into the day's plan
+        // in the bookings space; the next round is one past the highest the day has there.
+        int round = Itinerary.nextRound(bookings, tripId, date);
         List<String> interests = brief.map(b -> List.of(b.brief().split("[,;.]\\s*")))
                 .orElse(List.of());
         String location = brief.map(TravelBrief::to).orElse("unknown");

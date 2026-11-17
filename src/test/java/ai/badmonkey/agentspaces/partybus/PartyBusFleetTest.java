@@ -25,6 +25,7 @@ import ai.badmonkey.agentspaces.embabel.EmbabelRemoteActions;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingConfirmation;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingOrder;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.PartyDecision;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DayPlan;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
 import ai.badmonkey.agentspaces.partybus.domain.Research.HospitalList;
 import ai.badmonkey.agentspaces.partybus.domain.Research.ReviewDigest;
@@ -44,15 +45,12 @@ import ai.badmonkey.agentspaces.partybus.sources.RecordedSources;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
@@ -81,7 +79,7 @@ class PartyBusFleetTest {
     @Timeout(180)
     void theFleetDiscoversEveryCapabilityAndTheLeaderLeaseMatchesTheRealCadence()
             throws Exception {
-        int base = freePortBlock(4);
+        int base = TestPorts.freeBlock(4);
         List<Peer> clerkPeers = new ArrayList<>();
         try {
             clerkPeers.add(PartyBusFleet.startPeer("clerk-1", base, 0));
@@ -91,13 +89,13 @@ class PartyBusFleetTest {
             List<PartyBusFleet.Clerk> clerks = PartyBusFleet.formBookingQuorum(clerkPeers);
             assertThat(clerks).hasSize(3);
 
-            PartyBusFleet.Clerk leader = await(() -> clerks.stream()
+            PartyBusFleet.Clerk leader = Waits.await("partybus.desk.leader", () -> clerks.stream()
                     .filter(c -> c.raft().isLeader()).findFirst(), Duration.ofSeconds(60))
                     .orElseThrow(() -> new AssertionError("the quorum elects no leader"));
             Peer observer = clerkPeers.stream()
                     .filter(p -> !p.peerId().equals(leader.peer().peerId())).findFirst().orElseThrow();
 
-            CapabilityAdvertisement ad = await(() -> observer.capabilities()
+            CapabilityAdvertisement ad = Waits.await("partybus.leader.advertised", () -> observer.capabilities()
                     .providersOf("aspace:cap/ordered-log").stream()
                     .filter(c -> c.issuer().equals(leader.peer().peerId()))
                     .filter(c -> "leader".equals(c.parameters().get("role")))
@@ -112,10 +110,10 @@ class PartyBusFleetTest {
 
             // The aggregate and both vote spaces are advertised too, each vote
             // space on its own advertisement.
-            assertThat(await(() -> observer.capabilities().providersOf("aspace:cap/aggregate")
+            assertThat(Waits.await("partybus.aggregate.advertised", () -> observer.capabilities().providersOf("aspace:cap/aggregate")
                     .stream().filter(c -> c.issuer().equals(leader.peer().peerId())).findFirst(),
                     Duration.ofSeconds(30))).isPresent();
-            assertThat(await(() -> {
+            assertThat(Waits.await("partybus.vote.advertised", () -> {
                 Set<String> bindings = observer.capabilities().providersOf("aspace:cap/vote")
                         .stream().filter(c -> c.issuer().equals(leader.peer().peerId()))
                         .map(CapabilityAdvertisement::binding).collect(Collectors.toSet());
@@ -146,12 +144,12 @@ class PartyBusFleetTest {
     @Timeout(420)
     void theBusResearchesPlansBooksAndSurvivesTheWeek() throws Exception {
         RecordedSources sources = RecordedSources.lisbon();
-        PartyBus.Seating bus = PartyBus.board(sources, freePortBlock(40), 0);
+        PartyBus.Seating bus = TestPorts.board(sources);
         try {
             Peer turret = bus.turretPeer();
             Space trip = turret.space(PartyBusFleet.TRIP);
             Space research = turret.space(PartyBusFleet.RESEARCH);
-            Thread.sleep(2500);
+            Waits.formed(turret, bus.peers());
 
             trip.write(PartyBus.party(TRIP), Lease.of(Duration.ofHours(1)));
             TravelBrief brief = PartyBus.brief(TRIP);
@@ -159,33 +157,32 @@ class PartyBusFleetTest {
 
             // 1. The bag drains: every specialist answered its request type.
             for (Class<?> result : PartyBusPlanner.RESULT_TYPES) {
-                assertThat(await(() -> research.read(Template.of(result)
+                assertThat(Waits.await("partybus.research.answered", () -> research.read(Template.of(result)
                         .where("tripId", eq(TRIP))), Duration.ofSeconds(90)))
                         .as(result.getSimpleName()).isPresent();
             }
             assertThat(sources.lookups("flights")).isGreaterThanOrEqualTo(1);
 
             // 2. The safety panel voted the baseline advisory with a full quorum.
-            TravelAdvisory baseline = await(() -> advisory(trip, Safety.BASELINE),
+            TravelAdvisory baseline = Waits.await("partybus.advisory.baseline", () -> advisory(trip, Safety.BASELINE),
                     Duration.ofSeconds(60)).orElseThrow();
             assertThat(baseline.verdict()).isEqualTo("GO");
             assertThat(baseline.goVotes() + baseline.cautionVotes() + baseline.avoidVotes())
                     .isEqualTo(3);
 
-            // 3. Every day was auctioned to a planner, and more than one planner won.
-            Space slots = turret.space(PartyBusFleet.SLOTS);
-            List<ScheduledActivity> schedule = await(() -> {
-                List<ScheduledActivity> all = slots.readAll(Template.of(ScheduledActivity.class)
-                        .where("tripId", eq(TRIP)), 100);
-                return all.stream().map(ScheduledActivity::date).distinct().count()
-                        >= brief.days().size() ? Optional.of(all) : Optional.<List<ScheduledActivity>>empty();
+            // 3. Every day was auctioned to a planner, more than one planner won, and each day's
+            // plan was committed through the booking desk's ordered log.
+            Space bookings = turret.space(PartyBusFleet.BOOKINGS);
+            Map<String, DayPlan> committed = Waits.await("partybus.dayplan.committed", () -> {
+                Map<String, DayPlan> days = DayPlan.ofTrip(bookings, TRIP);
+                return days.size() >= brief.days().size() ? Optional.of(days) : Optional.<Map<String, DayPlan>>empty();
             }, Duration.ofSeconds(90)).orElseThrow();
-            assertThat(schedule.stream().map(ScheduledActivity::plannedBy).collect(Collectors.toSet()))
+            assertThat(committed.values().stream().map(d -> d.plan().plannedBy()).collect(Collectors.toSet()))
                     .hasSizeGreaterThanOrEqualTo(2);
-            assertThat(schedule).allSatisfy(a -> assertThat(a.costUsd()).isLessThan(150));
+            assertThat(committed.values()).allSatisfy(d -> assertThat(d.plan().costUsd()).isLessThan(150));
 
             // 4. The join fired, the stays were found, the advisory rode along.
-            TravelPlan plan = await(() -> trip.read(Template.of(TravelPlan.class)
+            TravelPlan plan = Waits.await("partybus.plan.assembled", () -> trip.read(Template.of(TravelPlan.class)
                     .where("tripId", eq(TRIP))), Duration.ofSeconds(60)).orElseThrow();
             assertThat(plan.title()).isNotBlank();
             assertThat(plan.stays()).isNotEmpty();
@@ -193,9 +190,8 @@ class PartyBusFleetTest {
             assertThat(plan.mapUrl()).startsWith("https://www.google.com/maps/");
 
             // 5. Each booking order was confirmed by exactly one clerk, through the log.
-            Space bookings = turret.space(PartyBusFleet.BOOKINGS);
             int orders = plan.stays().size();
-            List<BookingConfirmation> confirmations = await(() -> {
+            List<BookingConfirmation> confirmations = Waits.await("partybus.booking.confirmed", () -> {
                 List<BookingConfirmation> all = bookings.readAll(
                         Template.of(BookingConfirmation.class), 50);
                 return all.size() >= orders ? Optional.of(all) : Optional.<List<BookingConfirmation>>empty();
@@ -204,7 +200,7 @@ class PartyBusFleetTest {
                     .collect(Collectors.groupingBy(BookingConfirmation::orderId, Collectors.counting()));
             assertThat(perOrder.values()).allSatisfy(n -> assertThat(n).isEqualTo(1L));
             // The completions replicate as their own deltas; the orders drain within moments.
-            assertThat(await(() -> bookings.readAll(Template.of(BookingOrder.class), 50).isEmpty()
+            assertThat(Waits.await("partybus.booking.drained", () -> bookings.readAll(Template.of(BookingOrder.class), 50).isEmpty()
                     ? Optional.of(Boolean.TRUE) : Optional.<Boolean>empty(), Duration.ofSeconds(30)))
                     .isPresent();
 
@@ -218,7 +214,7 @@ class PartyBusFleetTest {
                     .isGreaterThanOrEqualTo(12);
             List<String> needed = List.of("sightseeing-scout_SightseeingRequest",
                     "review-reader_ReviewRequest");
-            assertThat(await(() -> {
+            assertThat(Waits.await("partybus.planner.actions", () -> {
                 Set<String> names = remote.available().stream().map(RemoteAction::name)
                         .collect(Collectors.toSet());
                 return names.containsAll(needed) ? Optional.of(names) : Optional.<Set<String>>empty();
@@ -246,24 +242,25 @@ class PartyBusFleetTest {
             // 7. The week: the simulator throws the script and the fleet reacts.
             Peer sim = bus.simulatorPeer();
             VacationSimulator simulator = new VacationSimulator(sim.space(PartyBusFleet.TRIP),
-                    sim.space(PartyBusFleet.SLOTS), sim.aggregate(), Duration.ofSeconds(4),
+                    sim.space(PartyBusFleet.SLOTS), sim.space(PartyBusFleet.BOOKINGS), sim.aggregate(),
+                    Duration.ofSeconds(4),
                     day -> { });
             List<VacationSimulator.Narration> week = simulator.live(brief,
                     VacationSimulator.lisbonWeek());
             assertThat(week).hasSize(brief.days().size());
 
             // The illness sent the hospital locator to the map.
-            assertThat(await(() -> research.readAll(Template.of(HospitalList.class)
+            assertThat(Waits.await("partybus.week.hospital", () -> research.readAll(Template.of(HospitalList.class)
                             .where("tripId", eq(TRIP)), 10).stream()
                     .filter(h -> h.topic().contains("illness")).findFirst(), Duration.ofSeconds(30)))
                     .isPresent();
             // The protest re-ran the sweep and the panel downgraded the advisory.
-            TravelAdvisory protest = await(() -> advisory(trip, TRIP + "-d3-protest"),
+            TravelAdvisory protest = Waits.await("partybus.advisory.protest", () -> advisory(trip, TRIP + "-d3-protest"),
                     Duration.ofSeconds(60)).orElseThrow();
             assertThat(protest.verdict()).isEqualTo("CAUTION");
             assertThat(protest.avoidVotes()).isEqualTo(1);
             // Every non-calm event got a response on the record.
-            Set<String> responded = await(() -> {
+            Set<String> responded = Waits.await("partybus.week.responses", () -> {
                 Set<String> ids = trip.readAll(Template.of(EventResponse.class)
                                 .where("tripId", eq(TRIP)), 50).stream()
                         .map(EventResponse::eventId).collect(Collectors.toSet());
@@ -271,19 +268,47 @@ class PartyBusFleetTest {
             }, Duration.ofSeconds(30)).orElseThrow();
             assertThat(responded).anyMatch(id -> id.endsWith(EventKind.STRIKE.name().toLowerCase()));
             // The storm day changed hands to an indoor planner; the party's energy bought a rest day.
-            List<ScheduledActivity> after = slots.readAll(Template.of(ScheduledActivity.class)
-                    .where("tripId", eq(TRIP)), 200);
-            // The photo walk waited for the curator's set: no walk was planned with an empty shot list.
-            assertThat(after.stream().filter(a -> a.kind().equals("PHOTO_WALK")).toList())
+            // The photo walk waited for the curator's set: no walk was planned with an empty shot list. Every plan
+            // made is in its day's record, including one a re-auction replaced.
+            assertThat(DayPlan.ofTrip(bookings, TRIP).values().stream().flatMap(d -> d.considered().stream())
+                    .filter(a -> a.kind().equals("PHOTO_WALK")).toList())
                     .isNotEmpty().noneMatch(a -> a.title().contains(" 0-shot"));
-            assertThat(after.stream().filter(a -> a.date().equals(brief.days().get(1)))
-                    .max((a, b) -> Integer.compare(a.round(), b.round())).orElseThrow().kind())
-                    .isEqualTo("DINING");
-            assertThat(await(() -> slots.readAll(Template.of(ScheduledActivity.class)
-                            .where("tripId", eq(TRIP)).where("kind", eq("REST")), 10).stream()
-                    .findFirst(), Duration.ofSeconds(30))).isPresent();
+            assertThat(Waits.await("partybus.storm.replanned", () -> DayPlan.current(bookings, TRIP, brief.days().get(1))
+                    .filter(d -> d.plan().round() >= 1), Duration.ofSeconds(30)))
+                    .hasValueSatisfying(d -> assertThat(d.plan().kind()).isEqualTo("DINING"));
+            assertThat(Waits.await("partybus.rest.planned", () -> DayPlan.ofTrip(bookings, TRIP).values().stream()
+                    .filter(d -> d.plan().kind().equals("REST")).findFirst(), Duration.ofSeconds(30)))
+                    .isPresent();
+            // One plan per day (owner rule 3: a shared schedule needs strong coordination). The ordered
+            // fold leaves no proposal unfolded, one accumulator per day once each fold has retired its
+            // predecessor, and the same plans at every replica. Liveness ceilings are 30 s; the time
+            // each took is printed.
+            long settleStart = System.nanoTime();
+            assertThat(Waits.await("partybus.dayplan.folded", () -> bookings.readAll(Template.of(ScheduledActivity.class)
+                    .where("tripId", eq(TRIP)), 50).isEmpty() ? Optional.of(true) : Optional.<Boolean>empty(),
+                    Duration.ofSeconds(30))).as("every proposal folded into its day").isPresent();
+            assertThat(Waits.await("partybus.dayplan.one-per-day", () -> {
+                Map<String, Long> perDay = bookings.readAllEntries(DayPlan.template(TRIP), 200).stream()
+                        .collect(Collectors.groupingBy(e -> e.value().date(), Collectors.counting()));
+                return perDay.size() == brief.days().size() && perDay.values().stream().allMatch(n -> n == 1)
+                        ? Optional.of(perDay) : Optional.<Map<String, Long>>empty();
+            }, Duration.ofSeconds(30))).as("one day plan per day").isPresent();
+            Map<String, DayPlan> atTurret = DayPlan.ofTrip(bookings, TRIP);
+            for (Peer peer : bus.peers()) {
+                assertThat(Waits.await("partybus.dayplan.replicated", () -> DayPlan.ofTrip(peer.space(PartyBusFleet.BOOKINGS), TRIP).equals(atTurret)
+                        ? Optional.of(true) : Optional.<Boolean>empty(), Duration.ofSeconds(30)))
+                        .as("the day plans at " + peer.name()).isPresent();
+            }
+            long settledMillis = (System.nanoTime() - settleStart) / 1_000_000;
+            int secondPlans = atTurret.values().stream().mapToInt(DayPlan::duplicates).sum();
+            long counted = bus.peers().stream().mapToLong(p -> p.space(PartyBusFleet.SLOTS).duplicateCompletions())
+                    .sum();
+            System.out.println("day plans: " + atTurret.values().stream().map(d -> d.date() + "=" + d.plan().kind()
+                    + "/r" + d.plan().round() + "/p" + d.proposals() + "/d" + d.duplicates() + "/s" + d.stale())
+                    .toList() + "; second plans for a round: " + secondPlans
+                    + "; duplicate slot completions counted: " + counted + "; settled in " + settledMillis + " ms");
             // The travelers voted on where to go next.
-            PartyDecision next = await(() -> trip.read(Template.of(PartyDecision.class)
+            PartyDecision next = Waits.await("partybus.vote.decided", () -> trip.read(Template.of(PartyDecision.class)
                     .where("tripId", eq(TRIP))), Duration.ofSeconds(60)).orElseThrow();
             assertThat(next.winner()).isNotBlank();
             assertThat(next.tally().stream().mapToInt(t -> Integer.parseInt(t.split("=")[1])).sum())
@@ -308,38 +333,4 @@ class PartyBusFleetTest {
                 .where("wave", eq(wave)), 10).stream().findFirst();
     }
 
-    private static <T> Optional<T> await(Supplier<Optional<T>> probe, Duration timeout)
-            throws InterruptedException {
-        long deadline = System.nanoTime() + timeout.toNanos();
-        while (System.nanoTime() < deadline) {
-            Optional<T> value = probe.get();
-            if (value.isPresent()) {
-                return value;
-            }
-            Thread.sleep(250);
-        }
-        return probe.get();
-    }
-
-    /** A base port with {@code size} consecutive free ports after it. */
-    private static int freePortBlock(int size) throws IOException {
-        for (int attempt = 0; attempt < 50; attempt++) {
-            int base;
-            try (ServerSocket socket = new ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())) {
-                base = socket.getLocalPort();
-            }
-            boolean free = true;
-            for (int p = base; p < base + size && free; p++) {
-                try (ServerSocket probe = new ServerSocket(p)) {
-                    probe.setReuseAddress(true);
-                } catch (IOException e) {
-                    free = false;
-                }
-            }
-            if (free) {
-                return base;
-            }
-        }
-        throw new IOException("no free port block of " + size);
-    }
 }

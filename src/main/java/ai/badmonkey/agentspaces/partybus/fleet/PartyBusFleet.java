@@ -73,7 +73,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   <li>{@code decisions}: the travelers' proposals and signed ballots (the same
  *       capability, a different electorate).</li>
  *   <li>{@code slots}: the day slots the activity planners bid for. AUCTION.</li>
- *   <li>{@code bookings}: reservation orders committed exactly once through
+ *   <li>{@code bookings}: reservation orders committed exactly once, and the
+ *       planners' proposals folded into one plan per day, both through
  *       {@code aspace:cap/ordered-log}.</li>
  *   <li>{@code fleet-control} and {@code c2-audit}: the turret's directives and
  *       its signed audit trail.</li>
@@ -116,6 +117,36 @@ public final class PartyBusFleet {
 
     private static final String HOST = "127.0.0.1";
 
+    /** The group's gossip parameters: fanout 3, period 1 s. */
+    private static final GroupAdvertisement.GossipParameters GOSSIP =
+            GroupAdvertisement.GossipParameters.defaults();
+
+    /**
+     * How long a take waits for a competing claim before it believes it holds the
+     * entry: twice the group's gossip period, the settle window SPEC §7.4 gives as
+     * the default. The bus used to wait 200 ms. A wait that short is safe only where
+     * no claim waits on a gossip repair, which SPEC §5.3 promises for a group no
+     * larger than the fanout; the bus seats about twenty peers over a fanout of
+     * three, so some members hear an item by a tree repair, whose first ask alone
+     * waits 0.5 to 1.5 s. Measured on the fleet test while the tree settles
+     * (2026-11-15, 200 ms window, 15 runs that timed every claim): a claim reaches
+     * a planner in about 5 ms (median), but in 9 runs some planner heard one 0.3
+     * to 2.4 s late, even in a run where every day slot itself arrived within 50 ms.
+     * In 4 of the 15 runs two planners each won the same day at their own replica
+     * (7 days in all), and every one of them began with a claim that reached a
+     * rival planner later than the window. The loser either learned of the cheaper
+     * claim before completing (the take was lost: LeaseExpiredException, "action
+     * failed; lease will lapse") or completed too and wrote a second activity for
+     * the day.
+     * Two seconds covers most repairs. It does not cover all of them, so a rare
+     * double win stays possible, as SPEC §7.4 allows for AUCTION. The window only
+     * keeps that wasted work rare: what makes the day's plan one plan is the
+     * ordered fold at the booking desk ({@link Assemblers.ItineraryKeeper}), which
+     * counts a second plan for a round and keeps the lower bid. A take now costs
+     * about 2 s instead of 0.2 s, and the fleet test about 50 to 55 s instead of 37 s.
+     */
+    static final Duration SETTLE_WINDOW = GOSSIP.period().multipliedBy(2);
+
     private PartyBusFleet() {
     }
 
@@ -125,7 +156,7 @@ public final class PartyBusFleet {
         return new GroupAdvertisement("aspace://" + groupId.value(),
                 PeerIdentity.generate().peerId(), groupId, Instant.EPOCH, Duration.ofDays(365),
                 GROUP, GroupAdvertisement.MembershipPolicy.OPEN, ConflictStrategyType.LEASE_RACE,
-                GroupAdvertisement.GossipParameters.defaults());
+                GOSSIP);
     }
 
     /** One seat on the bus: a peer with its replicas, binder, and capabilities. */
@@ -323,7 +354,7 @@ public final class PartyBusFleet {
         Map<String, ReplicatedSpace> spaces = new LinkedHashMap<>();
         for (String spaceName : SPACES) {
             ReplicatedSpace.Builder builder = ReplicatedSpace.builder(runtime, spaceName,
-                    identity, name).settleWindow(Duration.ofMillis(200));
+                    identity, name).settleWindow(SETTLE_WINDOW);
             if (spaceName.equals(SLOTS)) {
                 // The bid comes from the planner's @BidFunction at bind time; a bid
                 // function is single-assignment per space per peer (QA4 A4-8), so a
@@ -375,7 +406,7 @@ public final class PartyBusFleet {
     /**
      * Forms the booking quorum: a Raft group among the clerk peers, an
      * {@link OrderedTakes} coordinator per clerk over its {@code bookings}
-     * replica, and a running clerk on each.
+     * replica, and a running clerk and itinerary keeper on each.
      *
      * @param clerks the clerk peers (three is the right number)
      * @return the seated clerks, in the same order
@@ -395,6 +426,8 @@ public final class PartyBusFleet {
             // The clerk is one @OrderedTake method; the binder owns the take loop.
             clerk.binder().ordered(BOOKINGS, ordered);
             clerk.bind(new Assemblers.BookingClerk(raft, clerk.name()));
+            // The itinerary keeper folds the day plans through the same log: one plan per day.
+            clerk.bind(new Assemblers.ItineraryKeeper());
             seated.add(new Clerk(clerk, raft, ordered));
         }
         return seated;

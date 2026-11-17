@@ -22,7 +22,7 @@ import ai.badmonkey.agentspaces.capabilities.aggregate.PushSumAggregate;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DaySlot;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.EnergyReport;
-import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DayPlan;
 import ai.badmonkey.agentspaces.partybus.domain.Simulation.EventKind;
 import ai.badmonkey.agentspaces.partybus.domain.Simulation.TripDay;
 import ai.badmonkey.agentspaces.partybus.domain.Simulation.TripEvent;
@@ -58,9 +58,13 @@ public final class VacationSimulator {
     public record Scene(int dayIndex, EventKind kind, String detail, int severity) {
     }
 
-    /** A daily narration line, for the demo's console. */
+    /**
+     * A daily narration line, for the demo's console.
+     *
+     * @param plan the day's one plan as the itinerary keepers committed it, or null when none is committed yet
+     */
     public record Narration(String date, String pace, OptionalDouble energy, TripEvent event,
-                            List<ScheduledActivity> schedule) {
+                            DayPlan plan) {
     }
 
     /** The bundled script: the week the recorded trip has. */
@@ -77,6 +81,7 @@ public final class VacationSimulator {
 
     private final Space trip;
     private final Space slots;
+    private final Space bookings;
     private final PushSumAggregate aggregate;
     private final Duration dayLength;
     private final Consumer<Narration> narrator;
@@ -84,14 +89,16 @@ public final class VacationSimulator {
     /**
      * @param trip      the trip space
      * @param slots     the auction space (for re-auctions on a rest day)
+     * @param bookings  the space the day plans are committed in
      * @param aggregate the push-sum capability the party reports energy into
      * @param dayLength how long a simulated day lasts
      * @param narrator  receives one narration per day
      */
-    public VacationSimulator(Space trip, Space slots, PushSumAggregate aggregate,
+    public VacationSimulator(Space trip, Space slots, Space bookings, PushSumAggregate aggregate,
                              Duration dayLength, Consumer<Narration> narrator) {
         this.trip = Objects.requireNonNull(trip, "trip");
         this.slots = Objects.requireNonNull(slots, "slots");
+        this.bookings = Objects.requireNonNull(bookings, "bookings");
         this.aggregate = Objects.requireNonNull(aggregate, "aggregate");
         this.dayLength = Objects.requireNonNull(dayLength, "dayLength");
         this.narrator = Objects.requireNonNull(narrator, "narrator");
@@ -144,9 +151,8 @@ public final class VacationSimulator {
                                 .where("tripId", eq(brief.tripId())).where("date", eq(date)), 20)
                         .stream().mapToInt(EnergyReport::energy).average();
             }
-            List<ScheduledActivity> schedule = slots.readAll(Template.of(ScheduledActivity.class)
-                    .where("tripId", eq(brief.tripId())).where("date", eq(date)), 10);
-            story.add(new Narration(date, pace, energy, event, schedule));
+            DayPlan plan = DayPlan.current(bookings, brief.tripId(), date).orElse(null);
+            story.add(new Narration(date, pace, energy, event, plan));
             narrator.accept(story.get(story.size() - 1));
 
             String next = paceFor(energy);
@@ -159,9 +165,7 @@ public final class VacationSimulator {
     }
 
     private void reauction(TravelBrief brief, String date, String pace) {
-        int round = slots.readAll(Template.of(ScheduledActivity.class)
-                        .where("tripId", eq(brief.tripId())).where("date", eq(date)), 10).stream()
-                .mapToInt(ScheduledActivity::round).max().orElse(0) + 1;
+        int round = Itinerary.nextRound(bookings, brief.tripId(), date);
         slots.write(new DaySlot(brief.tripId(), date, brief.to(),
                 List.of(brief.brief().split("[,;.]\\s*")), pace, round),
                 Lease.of(Duration.ofHours(6)));

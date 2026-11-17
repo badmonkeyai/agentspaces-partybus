@@ -17,7 +17,9 @@ package ai.badmonkey.agentspaces.partybus;
 
 import ai.badmonkey.agentspaces.partybus.agents.Planners;
 import ai.badmonkey.agentspaces.partybus.agents.SafetyPanel;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DayPlan;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DaySlot;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
 import ai.badmonkey.agentspaces.partybus.domain.Research.HotelOptions;
 import ai.badmonkey.agentspaces.partybus.domain.Safety.DangerAssessment;
 import ai.badmonkey.agentspaces.partybus.domain.Trip.TravelBrief;
@@ -126,5 +128,36 @@ class PartyBusUnitTest {
         assertThat(VacationSimulator.paceFor(OptionalDouble.of(31))).isEqualTo("REST");
         assertThat(VacationSimulator.lisbonWeek()).hasSize(7)
                 .anySatisfy(scene -> assertThat(scene.detail()).contains("clams"));
+    }
+
+    /**
+     * The itinerary fold commits the auction's own rule whatever order the ordered log delivers the
+     * proposals in: the latest round, then the lowest bid. A second plan for a round (two planners that
+     * both won a slot beyond the settle window) is counted, and a plan for a round a re-auction replaced
+     * changes nothing.
+     */
+    @Test
+    void theDayPlanFoldKeepsTheAuctionsRuleInAnyOrder() {
+        ScheduledActivity sights = new ScheduledActivity("t", "d", "L", "SIGHTS", "s", 45, "sights-planner", 0);
+        ScheduledActivity photo = new ScheduledActivity("t", "d", "L", "PHOTO_WALK", "p", 50, "photo-walk-planner", 0);
+        ScheduledActivity dining = new ScheduledActivity("t", "d", "L", "DINING", "m", 60, "dining-planner", 1);
+        List<List<ScheduledActivity>> orders = List.of(
+                List.of(sights, photo, dining), List.of(photo, sights, dining), List.of(dining, sights, photo),
+                List.of(photo, dining, sights), List.of(sights, dining, photo), List.of(dining, photo, sights));
+        for (List<ScheduledActivity> order : orders) {
+            DayPlan day = null;
+            for (ScheduledActivity proposal : order) {
+                day = DayPlan.fold(day, proposal);
+            }
+            assertThat(day.plan()).as(order.toString()).isEqualTo(dining);
+            assertThat(day.considered()).containsExactlyElementsOf(order);
+            // A round-0 plan that is not the day's first proposal counts once: as a second plan for its round
+            // when it precedes round 1, as stale after it.
+            assertThat(day.duplicates() + day.stale()).isEqualTo(order.indexOf(dining) == 0 ? 2 : 1);
+        }
+        DayPlan round0 = DayPlan.fold(DayPlan.fold(null, photo), sights);
+        assertThat(round0.plan()).isEqualTo(sights);
+        assertThat(round0.duplicates()).isEqualTo(1);
+        assertThat(DayPlan.fold(DayPlan.fold(null, sights), photo).plan()).isEqualTo(sights);
     }
 }

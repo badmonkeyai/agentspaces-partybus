@@ -15,12 +15,14 @@
  */
 package ai.badmonkey.agentspaces.partybus.agents;
 
+import ai.badmonkey.agentspaces.agent.Tagged;
 import ai.badmonkey.agentspaces.agent.annotation.AgentSpec;
 import ai.badmonkey.agentspaces.agent.annotation.BidFunction;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceRef;
 import ai.badmonkey.agentspaces.agent.annotation.SpaceTake;
 import ai.badmonkey.agentspaces.api.space.Space;
 import ai.badmonkey.agentspaces.api.space.Template;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.DaySlot;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.ScheduledActivity;
 import ai.badmonkey.agentspaces.partybus.domain.Research.PhotoSet;
@@ -39,9 +41,9 @@ import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
  * {@link DaySlot} is written once per day; each planner's {@code @BidFunction}
  * prices the day from its own point of view (how well the day suits what it
  * does, how the party's interests match, how the pace and the weather sit with
- * it); the space runs the CBBA rounds and awards the day to the lowest bid; and
+ * it); the space runs the CBBA rounds and routes the day to the lowest bid; and
  * the winner's {@code @SpaceTake} fires with the slot, returning the
- * {@link ScheduledActivity} the space writes back.
+ * {@link ScheduledActivity} it proposes for the day.
  *
  * <p>Nobody dispatches. The dining planner wins the foodie's days, the sights
  * planner wins the historian's days, the photo walk sweeps the cheap days in
@@ -49,7 +51,16 @@ import static ai.badmonkey.agentspaces.api.space.Matchers.eq;
  * {@code REST}, the rest planner's bid collapses and it wins the day with a
  * pool and a long lunch. When the simulator's storm re-auctions a day
  * ({@code round} climbs), the outdoor planners' bids rise and the day changes
- * hands. That is the whole scheduler.
+ * hands. That is the whole auction.
+ *
+ * <p>An auction picks one planner per day only while every claim reaches every rival
+ * planner within the settle window (SPEC §7.4); beyond it two planners can both win and
+ * plan the same round of a day. So the auction routes the work, and the plan is not the
+ * day's until the ordered log says so: each proposal goes to the bookings space, whose
+ * itinerary keepers fold it into the day's one {@link Itinerary.DayPlan}
+ * ({@link Assemblers.ItineraryKeeper}), keeping the auction's rule, the latest round and
+ * in it the lowest bid. The planners still bid and plan at once, in parallel; only the
+ * commit of a day is ordered.
  *
  * <p>Every planner carries a {@code @SpaceRef} to the research space so its
  * schedule names real places the scouts found rather than a placeholder. The
@@ -63,6 +74,11 @@ public final class Planners {
     public static final String SLOTS = "slots";
 
     private Planners() {
+    }
+
+    /** A plan as the planner hands it on: tagged with its day, the key the itinerary keepers fold it under. */
+    static Tagged<ScheduledActivity> proposal(ScheduledActivity plan) {
+        return Tagged.of(plan, Itinerary.DAY_TAG, Itinerary.dayKey(plan.tripId(), plan.date()));
     }
 
     /** Whether the party's interests mention any of the given words. */
@@ -98,16 +114,16 @@ public final class Planners {
             return bid + slot.round() * 5; // a strike barely touches a lunch
         }
 
-        @SpaceTake(space = SLOTS, lease = "1m", pollTimeout = "500ms")
-        public ScheduledActivity plan(DaySlot slot) {
+        @SpaceTake(space = SLOTS, resultSpace = Assemblers.BOOKINGS, lease = "1m", pollTimeout = "500ms")
+        public Tagged<ScheduledActivity> plan(DaySlot slot) {
             String table = research.readAll(Template.of(RestaurantOptions.class)
                             .where("tripId", eq(slot.tripId())), 20).stream()
                     .filter(r -> r.location().equalsIgnoreCase(slot.location()))
                     .flatMap(r -> r.restaurants().stream()).map(r -> r.name()).findFirst()
                     .orElse("a table the scouts are still finding");
-            return new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "DINING",
+            return proposal(new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "DINING",
                     "Market morning, long lunch, dinner at " + table, bid(slot),
-                    "dining-planner", slot.round());
+                    "dining-planner", slot.round()));
         }
     }
 
@@ -131,16 +147,16 @@ public final class Planners {
             return bid + slot.round() * 45; // storms and strikes ruin an outdoor day
         }
 
-        @SpaceTake(space = SLOTS, lease = "1m", pollTimeout = "500ms")
-        public ScheduledActivity plan(DaySlot slot) {
+        @SpaceTake(space = SLOTS, resultSpace = Assemblers.BOOKINGS, lease = "1m", pollTimeout = "500ms")
+        public Tagged<ScheduledActivity> plan(DaySlot slot) {
             List<PointOfInterest> pois = research.readAll(Template.of(SightseeingOptions.class)
                             .where("tripId", eq(slot.tripId())), 5).stream()
                     .flatMap(s -> s.pointsOfInterest().stream()).toList();
             String pick = pois.isEmpty() ? "the old town"
                     : pois.get(Math.abs(slot.date().hashCode()) % pois.size()).name();
-            return new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "SIGHTS",
+            return proposal(new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "SIGHTS",
                     "Sights day: " + pick + " and the streets around it", bid(slot),
-                    "sights-planner", slot.round());
+                    "sights-planner", slot.round()));
         }
     }
 
@@ -170,15 +186,15 @@ public final class Planners {
         /** How long the walk waits for the photo curator: the slots are auctioned before the scouts answer. */
         static final Duration PHOTO_SET_WAIT = Duration.ofSeconds(5);
 
-        @SpaceTake(space = SLOTS, lease = "1m", pollTimeout = "500ms")
-        public ScheduledActivity plan(DaySlot slot) {
+        @SpaceTake(space = SLOTS, resultSpace = Assemblers.BOOKINGS, lease = "1m", pollTimeout = "500ms")
+        public Tagged<ScheduledActivity> plan(DaySlot slot) {
             Template<PhotoSet> photos = Template.of(PhotoSet.class).where("tripId", eq(slot.tripId()));
             research.read(photos, PHOTO_SET_WAIT);
             int shots = research.readAll(photos, 10).stream()
                     .mapToInt(p -> p.images().size()).sum();
-            return new ScheduledActivity(slot.tripId(), slot.date(), slot.location(),
+            return proposal(new ScheduledActivity(slot.tripId(), slot.date(), slot.location(),
                     "PHOTO_WALK", "Golden-hour walk with a " + shots + "-shot list", bid(slot),
-                    "photo-walk-planner", slot.round());
+                    "photo-walk-planner", slot.round()));
         }
     }
 
@@ -193,11 +209,11 @@ public final class Planners {
             return slot.pace().equals("REST") ? 5 : 140;
         }
 
-        @SpaceTake(space = SLOTS, lease = "1m", pollTimeout = "500ms")
-        public ScheduledActivity plan(DaySlot slot) {
-            return new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "REST",
+        @SpaceTake(space = SLOTS, resultSpace = Assemblers.BOOKINGS, lease = "1m", pollTimeout = "500ms")
+        public Tagged<ScheduledActivity> plan(DaySlot slot) {
+            return proposal(new ScheduledActivity(slot.tripId(), slot.date(), slot.location(), "REST",
                     "Rest day: pool, siesta, one gentle dinner", bid(slot), "rest-planner",
-                    slot.round());
+                    slot.round()));
         }
     }
 }

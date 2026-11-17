@@ -27,6 +27,7 @@ import ai.badmonkey.agentspaces.partybus.agents.Planners;
 import ai.badmonkey.agentspaces.partybus.agents.SafetyPanel;
 import ai.badmonkey.agentspaces.partybus.agents.Scouts;
 import ai.badmonkey.agentspaces.partybus.agents.Watchers;
+import ai.badmonkey.agentspaces.partybus.domain.Itinerary;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.BookingConfirmation;
 import ai.badmonkey.agentspaces.partybus.domain.Itinerary.PartyDecision;
 import ai.badmonkey.agentspaces.partybus.domain.Research.ReviewDigest;
@@ -109,79 +110,87 @@ public final class PartyBus {
             }
         };
 
-        Peer turretPeer = seat.apply("turret");
+        // A seat that cannot start (its port taken, say) fails the whole boarding; the
+        // peers already seated are closed, so a caller that retries on fresh ports
+        // leaves no listener or ticking peer behind.
+        try {
+            Peer turretPeer = seat.apply("turret");
 
-        // The concierge desk: the agents that watch the whole trip rather than one task.
-        Peer concierge = seat.apply("concierge");
-        concierge.bind(new Dispatcher());
-        concierge.bind(new Assemblers.StayFinder());
-        concierge.bind(new Assemblers.PlanAssembler(sources));
-        concierge.bind(new SafetyPanel.Lead("safety-lead"));
+            // The concierge desk: the agents that watch the whole trip rather than one task.
+            Peer concierge = seat.apply("concierge");
+            concierge.bind(new Dispatcher());
+            concierge.bind(new Assemblers.StayFinder());
+            concierge.bind(new Assemblers.PlanAssembler(sources));
+            concierge.bind(new SafetyPanel.Lead("safety-lead"));
 
-        // The scouts and advisors: the research bag's workers, four to a peer.
-        Peer scoutsA = seat.apply("scouts-a");
-        scoutsA.bind(new Scouts.FlightScout(sources));
-        scoutsA.bind(new Scouts.HotelScout(sources));
-        scoutsA.bind(new Scouts.CarScout(sources));
-        scoutsA.bind(new Scouts.SightseeingScout(sources));
-        Peer scoutsB = seat.apply("scouts-b");
-        scoutsB.bind(new Scouts.RestaurantScout(sources));
-        scoutsB.bind(new Scouts.PhotoCurator(sources));
-        scoutsB.bind(new Scouts.ReviewReader(sources));
-        scoutsB.bind(new Scouts.NextDestinationAdvisor(sources));
-        Peer advisors = seat.apply("advisors");
-        advisors.bind(new Advisors.DietAdvisor(sources));
-        advisors.bind(new Advisors.FoodieAdvisor(sources));
-        advisors.bind(new Advisors.AccessibilityAdvisor(sources));
-        advisors.bind(new Advisors.HospitalLocator(sources));
+            // The scouts and advisors: the research bag's workers, four to a peer.
+            Peer scoutsA = seat.apply("scouts-a");
+            scoutsA.bind(new Scouts.FlightScout(sources));
+            scoutsA.bind(new Scouts.HotelScout(sources));
+            scoutsA.bind(new Scouts.CarScout(sources));
+            scoutsA.bind(new Scouts.SightseeingScout(sources));
+            Peer scoutsB = seat.apply("scouts-b");
+            scoutsB.bind(new Scouts.RestaurantScout(sources));
+            scoutsB.bind(new Scouts.PhotoCurator(sources));
+            scoutsB.bind(new Scouts.ReviewReader(sources));
+            scoutsB.bind(new Scouts.NextDestinationAdvisor(sources));
+            Peer advisors = seat.apply("advisors");
+            advisors.bind(new Advisors.DietAdvisor(sources));
+            advisors.bind(new Advisors.FoodieAdvisor(sources));
+            advisors.bind(new Advisors.AccessibilityAdvisor(sources));
+            advisors.bind(new Advisors.HospitalLocator(sources));
 
-        // The safety pipeline: watchers, the analyst, and the three-seat panel.
-        Peer watchers = seat.apply("watchers");
-        watchers.bind(new Watchers.NewsWatcher(sources));
-        watchers.bind(new Watchers.VideoWatcher(sources));
-        watchers.bind(new Watchers.SocialWatcher(sources));
-        watchers.bind(new Watchers.SentimentAnalyst(sources));
-        // One peer per panelist: a ballot's voter is the peer's own agent, so
-        // three seats sharing a peer would be one voter and the three-seat quorum
-        // could never close (QA4 A4-4).
-        for (String seatName : SafetyPanel.SEATS) {
-            Peer panelist = seat.apply("panelist-" + seatName);
-            panelist.bind(new SafetyPanel.Panelist(seatName));
+            // The safety pipeline: watchers, the analyst, and the three-seat panel.
+            Peer watchers = seat.apply("watchers");
+            watchers.bind(new Watchers.NewsWatcher(sources));
+            watchers.bind(new Watchers.VideoWatcher(sources));
+            watchers.bind(new Watchers.SocialWatcher(sources));
+            watchers.bind(new Watchers.SentimentAnalyst(sources));
+            // One peer per panelist: a ballot's voter is the peer's own agent, so
+            // three seats sharing a peer would be one voter and the three-seat quorum
+            // could never close (QA4 A4-4).
+            for (String seatName : SafetyPanel.SEATS) {
+                Peer panelist = seat.apply("panelist-" + seatName);
+                panelist.bind(new SafetyPanel.Panelist(seatName));
+            }
+
+            // The activity auction: one bid function per peer, so one planner per peer.
+            seat.apply("dining-planner").bind(new Planners.DiningPlanner());
+            seat.apply("sights-planner").bind(new Planners.SightsPlanner());
+            seat.apply("photo-walk-planner").bind(new Planners.PhotoWalkPlanner());
+            seat.apply("rest-planner").bind(new Planners.RestPlanner());
+
+            // The party itself: one peer per traveler, so each carries its own ballot
+            // and the party quorum is a quorum of members (QA4 A4-4).
+            Travelers party = party("lisbon-2026");
+            int[] stamina = {85, 70, 55};
+            for (int i = 0; i < party.travelers().size(); i++) {
+                Traveler traveler = party.travelers().get(i);
+                Peer seatOf = seat.apply("traveler-" + traveler.name().toLowerCase());
+                seatOf.bind(new Party.TravelerAgent(traveler, stamina[i], seatOf.aggregate()));
+            }
+            Peer bus = seat.apply("the-bus");
+            bus.bind(new Party.Lead(party.travelers().size()));
+
+            // The booking desk: three clerks, one Raft quorum.
+            List<Peer> clerks = List.of(seat.apply("clerk-a"), seat.apply("clerk-b"),
+                    seat.apply("clerk-c"));
+            PartyBusFleet.formBookingQuorum(clerks);
+
+            // The planner is where Tripper's own agent would run; the simulator rides with the turret.
+            Peer plannerPeer = seat.apply("planner");
+            Peer simulatorPeer = turretPeer;
+
+            Turret turret = Turret.over(turretPeer);
+            turretPeer.run(turret);
+            int bound = turret.start(consolePort);
+            System.out.println("turret: http://localhost:" + bound + "/  (operator token: "
+                    + Turret.OPERATOR_TOKEN + ")");
+            return new Seating(peers, turretPeer, plannerPeer, simulatorPeer);
+        } catch (Exception e) {
+            peers.forEach(Peer::close);
+            throw e;
         }
-
-        // The activity auction: one bid function per peer, so one planner per peer.
-        seat.apply("dining-planner").bind(new Planners.DiningPlanner());
-        seat.apply("sights-planner").bind(new Planners.SightsPlanner());
-        seat.apply("photo-walk-planner").bind(new Planners.PhotoWalkPlanner());
-        seat.apply("rest-planner").bind(new Planners.RestPlanner());
-
-        // The party itself: one peer per traveler, so each carries its own ballot
-        // and the party quorum is a quorum of members (QA4 A4-4).
-        Travelers party = party("lisbon-2026");
-        int[] stamina = {85, 70, 55};
-        for (int i = 0; i < party.travelers().size(); i++) {
-            Traveler traveler = party.travelers().get(i);
-            Peer seatOf = seat.apply("traveler-" + traveler.name().toLowerCase());
-            seatOf.bind(new Party.TravelerAgent(traveler, stamina[i], seatOf.aggregate()));
-        }
-        Peer bus = seat.apply("the-bus");
-        bus.bind(new Party.Lead(party.travelers().size()));
-
-        // The booking desk: three clerks, one Raft quorum.
-        List<Peer> clerks = List.of(seat.apply("clerk-a"), seat.apply("clerk-b"),
-                seat.apply("clerk-c"));
-        PartyBusFleet.formBookingQuorum(clerks);
-
-        // The planner is where Tripper's own agent would run; the simulator rides with the turret.
-        Peer plannerPeer = seat.apply("planner");
-        Peer simulatorPeer = turretPeer;
-
-        Turret turret = Turret.over(turretPeer);
-        turretPeer.run(turret);
-        int bound = turret.start(consolePort);
-        System.out.println("turret: http://localhost:" + bound + "/  (operator token: "
-                + Turret.OPERATOR_TOKEN + ")");
-        return new Seating(peers, turretPeer, plannerPeer, simulatorPeer);
     }
 
     /**
@@ -232,8 +241,8 @@ public final class PartyBus {
             // The simulator: a week, narrated.
             Peer sim = bus.simulatorPeer();
             VacationSimulator simulator = new VacationSimulator(sim.space(PartyBusFleet.TRIP),
-                    sim.space(PartyBusFleet.SLOTS), sim.aggregate(), Duration.ofSeconds(8),
-                    PartyBus::narrate);
+                    sim.space(PartyBusFleet.SLOTS), sim.space(PartyBusFleet.BOOKINGS), sim.aggregate(),
+                    Duration.ofSeconds(8), PartyBus::narrate);
             simulator.live(brief(tripId), VacationSimulator.lisbonWeek());
 
             Thread.sleep(4000);
@@ -254,9 +263,11 @@ public final class PartyBus {
             line.append("\n   !! ").append(day.event().kind()).append(": ")
                     .append(day.event().detail());
         }
-        day.schedule().stream().max((a, b) -> Integer.compare(a.round(), b.round()))
-                .ifPresent(a -> line.append("\n   -> ").append(a.kind()).append(" by ")
-                        .append(a.plannedBy()).append(": ").append(a.title()));
+        if (day.plan() != null) {
+            Itinerary.ScheduledActivity a = day.plan().plan();
+            line.append("\n   -> ").append(a.kind()).append(" by ").append(a.plannedBy())
+                    .append(": ").append(a.title());
+        }
         System.out.println(line);
     }
 

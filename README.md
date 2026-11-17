@@ -105,9 +105,9 @@ agentspaces-spring-boot-starter,embabel-agentspaces
 | scouts-a, scouts-b | flight, hotel, car, sightseeing, restaurant, photo, review, next-destination | `@SpaceTake` on the `research` bag (LEASE_RACE), kill-tolerant |
 | advisors | diet, foodie, accessibility, hospital-locator | `@SpaceTake` on the same bag |
 | watchers | news, video, social watchers; sentiment analyst; three panelists | `@SpaceTake` sweeps, `@SpaceNotify` scoring, `aspace:cap/vote` QUORUM |
-| dining-, sights-, photo-walk-, rest-planner | one activity planner each | `@BidFunction` + `@SpaceTake` on `slots` (AUCTION) |
+| dining-, sights-, photo-walk-, rest-planner | one activity planner each | `@BidFunction` + `@SpaceTake` on `slots` (AUCTION), proposals to `bookings` |
 | the-bus | Marco, Priya, Dee, and the party lead | `aspace:cap/aggregate` push-sum (energy, spend) and `aspace:cap/vote` (where next) |
-| clerk-a, clerk-b, clerk-c | booking clerks | `aspace:cap/ordered-log`: exactly-once takes over a Raft quorum |
+| clerk-a, clerk-b, clerk-c | booking clerks, itinerary keepers | `aspace:cap/ordered-log`: exactly-once takes over a Raft quorum; `@SpaceReduce` ORDERED folds one plan per day |
 | planner | the Embabel planner's seat | remote-actions bridge (SPEC §10.6): every card is a typed action |
 | turret | the console, the simulator | HAL+JSON, SSE, C2 directives with a signed audit trail |
 
@@ -165,6 +165,16 @@ pricing functions, and the interesting behaviour falls out: when the travelers'
 energy drops, the rest planner's bid collapses and it takes the day; when the
 simulator's storm re-auctions a day, the outdoor planners price themselves out
 and the day changes hands. Nobody dispatches any of it.
+
+An auction picks one winner only while every claim reaches every rival within
+the settle window (SPEC §7.4), and on a bus of fifteen peers a claim sometimes
+arrives seconds late, so two planners can both win a day. The auction therefore
+routes the work, and the booking desk commits it: each planner writes its plan
+to `bookings` (`resultSpace = "bookings"`), and the itinerary keepers in
+`agents/Assemblers.java` fold every plan into the day's one `DayPlan` with
+`@SpaceReduce(mode = ORDERED)` through the clerks' Raft log. The fold keeps the
+auction's rule (the latest round, then the lowest bid) and counts a second plan
+for a round, so the party sees one plan per day at all times.
 
 **Signed quorum voting with a recomputable tally.** Look at
 `agents/SafetyPanel.java` for `vote.propose(...)` and `vote.castBallot(...)`,
