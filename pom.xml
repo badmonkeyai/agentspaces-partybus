@@ -46,7 +46,7 @@
     <embabel-agent.version>1.5.2</embabel-agent.version>
     <spring-boot.version>4.1.1</spring-boot.version>
     <partybus.main>ai.badmonkey.agentspaces.partybus.PartyBus</partybus.main>
-    <spring-ai.version>2.0.1</spring-ai.version>
+    <spring-ai.version>2.1.0-RC2</spring-ai.version>
     <!-- Jackson above the Boot/Spring AI managed versions; drop once they catch up. -->
     <jackson.version>2.21.7</jackson.version>
     <jackson3.version>3.1.7</jackson3.version>
